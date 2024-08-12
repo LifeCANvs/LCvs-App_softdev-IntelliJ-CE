@@ -4,6 +4,8 @@ The following conventions will be used to refer to directories on your machine:
 * `<USER_HOME>` is your home directory.
 * `<IDEA_HOME>` is the root directory for the IntelliJ source code.
 
+- also see [PyCharm Community Edition](python/README.md) included in this project...
+
 ## Getting IntelliJ IDEA Community Edition Source Code
 IntelliJ IDEA Community Edition source code is available from `github.com/JetBrains/intellij-community` by either cloning or
 downloading a zip file (based on a branch) into `<IDEA_HOME>`. The default is the *master* branch. 
