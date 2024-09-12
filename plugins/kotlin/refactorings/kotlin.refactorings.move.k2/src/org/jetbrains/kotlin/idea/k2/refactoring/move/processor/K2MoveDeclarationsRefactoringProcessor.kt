@@ -1,12 +1,15 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.move.processor
 
+import com.intellij.ide.util.EditorHelper
 import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
 import com.intellij.refactoring.BaseRefactoringProcessor
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.listeners.RefactoringEventData
+import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesDialog
 import com.intellij.refactoring.util.MoveRenameUsageInfo
 import com.intellij.usageView.UsageInfo
 import com.intellij.usageView.UsageViewDescriptor
@@ -16,6 +19,7 @@ import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
 import org.jetbrains.kotlin.idea.base.psi.deleteSingle
 import org.jetbrains.kotlin.idea.base.resources.KotlinBundle
 import org.jetbrains.kotlin.idea.k2.refactoring.move.descriptor.K2MoveOperationDescriptor
+import org.jetbrains.kotlin.psi.KtFile
 
 class K2MoveDeclarationsRefactoringProcessor(
     private val operationDescriptor: K2MoveOperationDescriptor.Declarations
@@ -43,11 +47,10 @@ class K2MoveDeclarationsRefactoringProcessor(
                 operationDescriptor.moveDescriptors.forEach { moveDescriptor ->
                     putAllValues(
                         findAllMoveConflicts(
-                            declarationsToCheck = moveDescriptor.source.elements,
+                            topLevelDeclarationsToMove = moveDescriptor.source.elements,
                             allDeclarationsToMove = operationDescriptor.sourceElements,
                             targetDir = moveDescriptor.target.baseDirectory,
                             targetPkg = moveDescriptor.target.pkgName,
-                            targetFileName = moveDescriptor.target.fileName,
                             usages = usages
                                 .filterIsInstance<MoveRenameUsageInfo>()
                                 .filter { it.referencedElement in moveDescriptor.source.elements },
@@ -61,18 +64,23 @@ class K2MoveDeclarationsRefactoringProcessor(
 
     @OptIn(KaAllowAnalysisOnEdt::class)
     override fun performRefactoring(usages: Array<out UsageInfo>) {
-        allowAnalysisOnEdt {
-            operationDescriptor.moveDescriptors.forEach { moveDescriptor ->
-                val elementsToMove = moveDescriptor.source.elements
+        val movedElements = allowAnalysisOnEdt {
+            operationDescriptor.moveDescriptors.flatMap { moveDescriptor ->
+                val elementsToMove = moveDescriptor.source.elements.withContext()
                 val targetFile = moveDescriptor.target.getOrCreateTarget(operationDescriptor.dirStructureMatchesPkg)
-                val sourceFiles = elementsToMove.map { it.containingKtFile }.distinct()
+                val sourceFiles = elementsToMove.map { it.containingFile as KtFile }.distinct()
                 val oldToNewMap = elementsToMove.moveInto(targetFile)
                 moveDescriptor.source.elements.forEach(PsiElement::deleteSingle)
+                sourceFiles.filter { it.declarations.isEmpty() }.forEach { it.delete() }
                 @Suppress("UNCHECKED_CAST")
                 retargetUsagesAfterMove(usages.toList(), oldToNewMap as Map<PsiElement, PsiElement>)
-                for (sourceFile in sourceFiles) {
-                    if (sourceFile.declarations.isEmpty()) sourceFile.delete()
-                }
+                oldToNewMap.values
+            }
+        }
+
+        if (MoveFilesOrDirectoriesDialog.isOpenInEditorProperty()) { // for simplicity, we re-use logic from move files
+            ApplicationManager.getApplication().invokeLater {
+                EditorHelper.openFilesInEditor(movedElements.toTypedArray())
             }
         }
     }

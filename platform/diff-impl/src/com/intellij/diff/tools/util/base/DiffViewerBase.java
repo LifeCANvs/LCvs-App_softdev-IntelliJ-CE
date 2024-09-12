@@ -40,6 +40,7 @@ public abstract class DiffViewerBase implements DiffViewerEx, UiCompatibleDataPr
 
   @NotNull private final DiffTaskQueue myTaskExecutor = new DiffTaskQueue();
   @NotNull private final Alarm taskAlarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, null, null, null);
+  private boolean pendingRediff = true;
   private volatile boolean isDisposed;
 
   public DiffViewerBase(@NotNull DiffContext context, @NotNull ContentDiffRequest request) {
@@ -118,7 +119,7 @@ public abstract class DiffViewerBase implements DiffViewerEx, UiCompatibleDataPr
     abortRediff();
 
     if (UIUtil.isShowing(getComponent())) {
-      taskAlarm.addRequest(this::rediff, ProgressIndicatorWithDelayedPresentation.DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS);
+      taskAlarm.addRequest(() -> rediff(), ProgressIndicatorWithDelayedPresentation.DEFAULT_PROGRESS_DIALOG_POSTPONE_TIME_MILLIS);
     }
   }
 
@@ -139,6 +140,7 @@ public abstract class DiffViewerBase implements DiffViewerEx, UiCompatibleDataPr
     if (isDisposed()) return;
     abortRediff();
 
+    pendingRediff = true;
     fireEvent(EventType.BEFORE_REDIFF);
     onBeforeRediff();
 
@@ -150,6 +152,7 @@ public abstract class DiffViewerBase implements DiffViewerEx, UiCompatibleDataPr
         final Runnable callback = performRediff(indicator);
         return () -> {
           callback.run();
+          pendingRediff = false;
           onAfterRediff();
           fireEvent(EventType.AFTER_REDIFF);
         };
@@ -175,6 +178,11 @@ public abstract class DiffViewerBase implements DiffViewerEx, UiCompatibleDataPr
   @NotNull
   public DiffContext getContext() {
     return myContext;
+  }
+
+  @RequiresEdt
+  public boolean hasPendingRediff() {
+    return pendingRediff;
   }
 
   public boolean isDisposed() {

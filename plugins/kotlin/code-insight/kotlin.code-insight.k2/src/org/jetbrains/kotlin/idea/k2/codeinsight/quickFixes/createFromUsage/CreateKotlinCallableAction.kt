@@ -5,7 +5,6 @@ import com.intellij.codeInsight.daemon.QuickFixBundle.message
 import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.lang.java.request.CreateExecutableFromJavaUsageRequest
 import com.intellij.lang.jvm.JvmClass
-import com.intellij.lang.jvm.JvmModifier
 import com.intellij.lang.jvm.actions.*
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
@@ -67,7 +66,12 @@ internal class CreateKotlinCallableAction(
 
     override fun getActionGroup(): JvmActionGroup = if (abstract) CreateAbstractMethodActionGroup else CreateMethodActionGroup
 
-    override fun getElementToMakeWritable(currentFile: PsiFile): PsiElement? = pointerToContainer.element
+    override fun getElementToMakeWritable(currentFile: PsiFile): PsiElement? {
+        if (isExtension) {
+            return currentFile
+        }
+        return pointerToContainer.element
+    }
 
     override fun startInWriteAction(): Boolean = true
 
@@ -113,10 +117,10 @@ internal class CreateKotlinCallableAction(
             val passedContainerElement = pointerToContainer.element ?: return
             val anchor = call
             val shouldComputeContainerFromAnchor =
-                if (passedContainerElement is PsiFile) passedContainerElement == anchor.containingFile && !isExtension
+                if (passedContainerElement is PsiFile) passedContainerElement == anchor.containingFile && !isExtension || !passedContainerElement.isWritable
                 else passedContainerElement.getContainer() == anchor.getContainer()
             val insertContainer: PsiElement = if (shouldComputeContainerFromAnchor) {
-                (anchor.getExtractionContainers().firstOrNull() ?:return)
+                anchor.getExtractionContainers().firstOrNull() ?:return
             } else {
                 passedContainerElement
             }
@@ -139,9 +143,7 @@ internal class CreateKotlinCallableAction(
         val container = getContainer()
         if (call == null || container == null) return null
         val modifierListAsString =
-            request.modifiers.filter { it != JvmModifier.PUBLIC }.joinToString(
-                separator = " ",
-                transform = { modifier -> CreateFromUsageUtil.modifierToString(modifier) })
+            request.modifiers.mapNotNull(CreateFromUsageUtil::visibilityModifierToString).joinToString(separator = " ")
         return buildString {
             append(modifierListAsString)
             if (abstract) {

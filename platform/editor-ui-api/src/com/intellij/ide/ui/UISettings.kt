@@ -616,22 +616,26 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
         val registryValue = Registry.get(registryKey)
         if (registryValue.isMultiValue) {
           val option = registryValue.selectedOption
-          if (option.equals("Enabled")) hint = true
-          else if (option.equals("Disabled")) hint = false
-          else hint = defaultValue
+          when {
+            option.equals("Enabled") -> hint = true
+            option.equals("Disabled") -> hint = false
+            else -> hint = defaultValue
+          }
         }
         else {
           hint = if (registryValue.isBoolean && registryValue.asBoolean()) true else defaultValue
         }
       }
-      else hint = defaultValue
+      else {
+        hint = defaultValue
+      }
       return if (hint) RenderingHints.VALUE_FRACTIONALMETRICS_ON else RenderingHints.VALUE_FRACTIONALMETRICS_OFF
     }
 
     fun getPreferredFractionalMetricsValue(): Any {
-      val enableByDefault = SystemInfo.isMacOSCatalina || (FontSubpixelResolution.ENABLED
-                                                           && AntialiasingType.getKeyForCurrentScope(false) ==
-                                                           RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+      val enableByDefault = SystemInfo.isMacOSCatalina ||
+                            (FontSubpixelResolution.ENABLED
+                             && AntialiasingType.getKeyForCurrentScope(false) == RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
       return calcFractionalMetricsHint("ide.text.fractional.metrics", enableByDefault)
     }
 
@@ -769,6 +773,7 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
 
   override fun noStateLoaded() {
     migrateFontParameters()
+    migrateSearchEverywherePreview()
   }
 
   override fun loadState(state: UISettingsState) {
@@ -780,6 +785,7 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
       notRoamableOptions.fixFontSettings()
     }
     migrateFontParameters()
+    migrateSearchEverywherePreview()
 
     // check tab placement in the editor
     val editorTabPlacement = state.editorTabPlacement
@@ -822,11 +828,13 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
       Registry.get("ide.allow.merge.buttons").setValue(false)
       state.allowMergeButtons = true
     }
+  }
 
-    // migrate old state of Search Everywhere preview
-    if (PropertiesComponent.getInstance().isValueSet("SearchEverywhere.previewPropertyKey")) {
+  private fun migrateSearchEverywherePreview() {
+    if (PropertiesComponent.getInstance().isTrueValue(SEARCH_EVERYWHERE_PREVIEW_LEGACY_STATE_KEY)) {
       state.showPreviewInSearchEverywhere = true
-      PropertiesComponent.getInstance().unsetValue("SearchEverywhere.previewPropertyKey")
+      state._incrementModificationCount()
+      PropertiesComponent.getInstance().unsetValue(SEARCH_EVERYWHERE_PREVIEW_LEGACY_STATE_KEY)
     }
   }
 
@@ -875,3 +883,5 @@ class UISettings @NonInjectable constructor(private val notRoamableOptions: NotR
   var EDITOR_TAB_LIMIT: Int = editorTabLimit
   //</editor-fold>
 }
+
+private const val SEARCH_EVERYWHERE_PREVIEW_LEGACY_STATE_KEY = "SearchEverywhere.previewPropertyKey"

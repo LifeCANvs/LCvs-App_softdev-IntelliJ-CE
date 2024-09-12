@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl;
 
+import com.intellij.codeHighlighting.RainbowHighlighter;
 import com.intellij.codeInsight.daemon.DaemonAnalyzerTestCase;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
@@ -120,7 +121,7 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     EditorMouseHoverPopupManager.getInstance();
   }
 
-  public void testHighlightInfoGeneratedByHighlightVisitorMustImmediatelyShowItselfOnScreenRightAfterCreation() {
+  public void testHighlightInfoGeneratedByHighlightVisitorMustImmediatelyShowItselfOnScreenRightAfterCreation() throws Exception {
     AtomicBoolean xxxMustBeVisible = new AtomicBoolean();
     HighlightVisitor visitor = new MyHighlightCommentsSubstringVisitor(xxxMustBeVisible);
     myProject.getExtensionArea().getExtensionPoint(HighlightVisitor.EP_HIGHLIGHT_VISITOR).registerExtension(visitor, getTestRootDisposable());
@@ -271,7 +272,7 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     }
   }
 
-  public void testDaemonListenerFiresEventsInCorrectOrderEvenWhenHighlightVisitorInterruptsItself() {
+  public void testDaemonListenerFiresEventsInCorrectOrderEvenWhenHighlightVisitorInterruptsItself() throws Exception {
     List<String> log = Collections.synchronizedList(new ArrayList<>());
     myProject.getMessageBus().connect(getTestRootDisposable())
       .subscribe(DaemonCodeAnalyzer.DAEMON_EVENT_TOPIC, new DaemonCodeAnalyzer.DaemonListener() {
@@ -378,7 +379,7 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
     }
   }
 
-  public void testHighlightVisitorsMustRunIndependentlyAndInParallel() {
+  public void testHighlightVisitorsMustRunIndependentlyAndInParallel() throws Exception {
     @Language("JAVA")
     String text = """
       class X {
@@ -579,5 +580,23 @@ public class DaemonHighlightVisitorRespondToChangesTest extends DaemonAnalyzerTe
       type("X");
       assertOneElement(ContainerUtil.filter(doHighlighting(HighlightSeverity.INFORMATION), h -> h.type.equals(HighlightInfoType.TODO)));
     }
+  }
+
+  public void testHighlightingVisitorDisabledAtSomePointEgSemanticHighlightingBeingDisabledMustRemoveAllHighlightersOfOutdatedVisitors() {
+    @Language("JAVA")
+    String text = """
+      class X {
+        void foo(int wwwwwwwwwwwwwwwww) {
+        }
+      }
+      """;
+    configureByText(JavaFileType.INSTANCE, text);
+    assertEmpty(ContainerUtil.filter(doHighlighting(), info -> info.type == RainbowHighlighter.RAINBOW_ELEMENT));
+    CodeInsightTestFixtureImpl.runWithRainbowEnabled(true, () -> {
+      myDaemonCodeAnalyzer.restart();
+      assertNotEmpty(ContainerUtil.filter(doHighlighting(), info -> info.type == RainbowHighlighter.RAINBOW_ELEMENT));
+    });
+    myDaemonCodeAnalyzer.restart();
+    assertEmpty(ContainerUtil.filter(doHighlighting(), info -> info.type == RainbowHighlighter.RAINBOW_ELEMENT));
   }
 }

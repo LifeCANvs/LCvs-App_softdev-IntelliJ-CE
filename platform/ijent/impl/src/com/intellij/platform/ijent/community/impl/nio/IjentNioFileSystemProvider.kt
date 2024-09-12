@@ -2,12 +2,14 @@
 package com.intellij.platform.ijent.community.impl.nio
 
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.platform.core.nio.fs.BasicFileAttributesHolder2.FetchAttributesFilter
 import com.intellij.platform.ijent.community.impl.IjentFsResultImpl
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider.Companion.newFileSystemMap
 import com.intellij.platform.ijent.community.impl.nio.IjentNioFileSystemProvider.UnixFilePermissionBranch.*
 import com.intellij.platform.ijent.fs.*
 import com.intellij.platform.ijent.fs.IjentFileInfo.Type.*
 import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi.CreateDirectoryException
+import com.intellij.platform.ijent.fs.IjentFileSystemPosixApi.CreateSymbolicLinkException
 import com.intellij.platform.ijent.fs.IjentPosixFileInfo.Type.Symlink
 import com.intellij.util.text.nullize
 import com.sun.nio.file.ExtendedCopyOption
@@ -179,17 +181,34 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     val nioFs = dir.nioFs
 
     return fsBlocking {
-      // TODO listDirectoryWithAttrs+sun.nio.fs.BasicFileAttributesHolder
-      val childrenNames = nioFs.ijentFs.listDirectory(ensurePathIsAbsolute(dir.ijentPath)).getOrThrowFileSystemException()
-
-      val nioPathList = childrenNames.asSequence()
-        .map { childName ->
-          IjentNioPath(dir.ijentPath.getChild(childName).getOrThrow(), nioFs)
+      val notFilteredPaths =
+        if (pathFilter is FetchAttributesFilter) {
+          nioFs.ijentFs
+            .listDirectoryWithAttrs(ensurePathIsAbsolute(dir.ijentPath), IjentFileSystemApi.SymlinkPolicy.DO_NOT_RESOLVE)
+            .getOrThrowFileSystemException()
+            .asSequence()
+            .map { (childName, childStat) ->
+              val childIjentPath = dir.ijentPath.getChild(childName).getOrThrow()
+              val childAttrs = when (childStat) {
+                is IjentPosixFileInfo -> IjentNioPosixFileAttributes(childStat)
+                is IjentWindowsFileInfo -> TODO()
+              }
+              IjentNioPath(childIjentPath, nioFs, childAttrs)
+            }
         }
-        .filter { nioPath ->
-          pathFilter?.accept(nioPath) != false
+        else {
+          nioFs.ijentFs
+            .listDirectory(ensurePathIsAbsolute(dir.ijentPath))
+            .getOrThrowFileSystemException()
+            .asSequence()
+            .map { childName ->
+              val childIjentPath = dir.ijentPath.getChild(childName).getOrThrow()
+              IjentNioPath(childIjentPath, nioFs, null)
+            }
         }
-        .toMutableList()
+      val nioPathList = notFilteredPaths.filterTo(mutableListOf()) { nioPath ->
+        pathFilter?.accept(nioPath) != false
+      }
 
       object : DirectoryStream<Path> {
         // The compiler doesn't (didn't?) allow to relax types here.
@@ -234,7 +253,7 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     }
     fsBlocking {
       try {
-        path.nioFs.ijentFs.delete(path.ijentPath as IjentPath.Absolute,false, false)
+        path.nioFs.ijentFs.delete(path.ijentPath as IjentPath.Absolute, false)
       }
       catch (e: IjentFileSystemApi.DeleteException) {
         e.throwFileSystemException()
@@ -273,7 +292,8 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     fsBlocking {
       try {
         fs.copy(copyOptions)
-      } catch (e : IjentFileSystemApi.CopyException) {
+      }
+      catch (e: IjentFileSystemApi.CopyException) {
         e.throwFileSystemException()
       }
     }
@@ -292,8 +312,11 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
           sourcePath,
           targetPath,
           replaceExisting = true,
-          followLinks = LinkOption.NOFOLLOW_LINKS !in options)
-      } catch (e : IjentFileSystemApi.MoveException) {
+          // In NIO, `move` does not follow links. This behavior is not influenced by the presense of NOFOLLOW_LINKS in CopyOptions
+          // See java.nio.file.CopyMoveHelper.convertMoveToCopyOptions
+          followLinks = false)
+      }
+      catch (e: IjentFileSystemApi.MoveException) {
         e.throwFileSystemException()
       }
     }
@@ -324,8 +347,10 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     fsBlocking {
       when (val ijentFs = fs.ijentFs) {
         is IjentFileSystemPosixApi -> {
-          // According to the javadoc, this method must follow symlinks.
-          val fileInfo = ijentFs.stat(ensurePathIsAbsolute(path.ijentPath), resolveSymlinks = true).getOrThrowFileSystemException()
+          val fileInfo = ijentFs
+            // According to the javadoc, this method must follow symlinks.
+            .stat(ensurePathIsAbsolute(path.ijentPath), IjentFileSystemApi.SymlinkPolicy.RESOLVE_AND_FOLLOW)
+            .getOrThrowFileSystemException()
           // Inspired by sun.nio.fs.UnixFileSystemProvider#checkAccess
           val filePermissionBranch = when {
             ijentFs.user.uid == fileInfo.permissions.owner -> OWNER
@@ -370,16 +395,23 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
   }
 
   override fun <V : FileAttributeView?> getFileAttributeView(path: Path, type: Class<V>?, vararg options: LinkOption?): V {
-    TODO("Not yet implemented")
+    TODO("Not yet implemented -> com.intellij.platform.ijent.functional.fs.TodoOperation.READ_ATTRIBUTES")
   }
 
   override fun <A : BasicFileAttributes> readAttributes(path: Path, type: Class<A>, vararg options: LinkOption): A {
     val fs = ensureIjentNioPath(path).nioFs
 
+    val linkPolicy = if (LinkOption.NOFOLLOW_LINKS in options) {
+      IjentFileSystemApi.SymlinkPolicy.DO_NOT_RESOLVE
+    }
+    else {
+      IjentFileSystemApi.SymlinkPolicy.RESOLVE_AND_FOLLOW
+    }
+
     val result = when (val ijentFs = fs.ijentFs) {
       is IjentFileSystemPosixApi ->
         IjentNioPosixFileAttributes(fsBlocking {
-          statPosix(path.ijentPath, ijentFs, LinkOption.NOFOLLOW_LINKS in options)
+          ijentFs.stat(ensurePathIsAbsolute(path.ijentPath), linkPolicy).getOrThrowFileSystemException()
         })
 
       is IjentFileSystemWindowsApi -> TODO()
@@ -389,20 +421,13 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     return result as A
   }
 
-  private tailrec suspend fun statPosix(path: IjentPath, fsApi: IjentFileSystemPosixApi, resolveSymlinks: Boolean): IjentPosixFileInfo {
-    val stat = fsApi.stat(ensurePathIsAbsolute(path), resolveSymlinks = resolveSymlinks).getOrThrowFileSystemException()
-    return when (val type = stat.type) {
-      is Directory, is Other, is Regular, is Symlink.Unresolved -> stat
-      is Symlink.Resolved -> statPosix(type.result, fsApi, resolveSymlinks)
-    }
-  }
-
   override fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): MutableMap<String, Any> {
-    TODO("Not yet implemented")
+    TODO("Not yet implemented -> com.intellij.platform.ijent.functional.fs.TodoOperation.READ_ATTRIBUTES")
   }
 
   override fun setAttribute(path: Path, attribute: String?, value: Any?, vararg options: LinkOption?) {
-    TODO("Not yet implemented")
+    TODO("Not yet implemented -> com.intellij.platform.ijent.functional.fs.TodoOperation.READ_ATTRIBUTES " +
+         "com.intellij.platform.ijent.functional.fs.TodoOperation.UNIX_ATTRIBUTES")
   }
 
   override fun newAsynchronousFileChannel(
@@ -411,19 +436,51 @@ class IjentNioFileSystemProvider : FileSystemProvider() {
     executor: ExecutorService?,
     vararg attrs: FileAttribute<*>?,
   ): AsynchronousFileChannel {
-    TODO("Not yet implemented")
+    TODO("Not yet implemented -> com.intellij.platform.ijent.functional.fs.TodoOperation.ASYNC_FILE_CHANNEL")
   }
 
-  override fun createSymbolicLink(link: Path?, target: Path?, vararg attrs: FileAttribute<*>?) {
-    TODO("Not yet implemented")
+  override fun createSymbolicLink(link: Path, target: Path, vararg attrs: FileAttribute<*>?) {
+    if (attrs.isNotEmpty()) {
+      throw UnsupportedOperationException("Attributes are not supported for symbolic links")
+    }
+
+    val fs = ensureIjentNioPath(link).nioFs
+    val linkPath = ensurePathIsAbsolute(link.ijentPath)
+
+    require(ensureIjentNioPath(target).nioFs == fs) {
+      "Can't create symlinks between different file systems"
+    }
+
+    try {
+      fsBlocking {
+        when (val ijentFs = fs.ijentFs) {
+          is IjentFileSystemPosixApi -> ijentFs.createSymbolicLink(target.ijentPath, linkPath)
+          is IjentFileSystemWindowsApi -> TODO("Symbolic links are not supported on Windows")
+        }
+      }
+    }
+    catch (e: CreateSymbolicLinkException) {
+      e.throwFileSystemException()
+    }
   }
 
   override fun createLink(link: Path?, existing: Path?) {
-    TODO("Not yet implemented")
+    TODO("Not yet implemented -> com.intellij.platform.ijent.functional.fs.TodoOperation.HARD_LINK")
   }
 
-  override fun readSymbolicLink(link: Path?): Path {
-    TODO("Not yet implemented")
+  override fun readSymbolicLink(link: Path): Path {
+    val fs = ensureIjentNioPath(link).nioFs
+    val absolutePath = ensurePathIsAbsolute(link.ijentPath)
+    return fsBlocking {
+      when (val ijentFs = fs.ijentFs) {
+        is IjentFileSystemPosixApi -> when (val type = ijentFs.stat(absolutePath, IjentFileSystemApi.SymlinkPolicy.JUST_RESOLVE).getOrThrowFileSystemException().type) {
+          is Symlink.Resolved -> IjentNioPath(type.result, link.nioFs, null)
+          is Directory, is Regular, is Other -> throw NotLinkException(link.toString())
+          is Symlink.Unresolved -> error("Impossible, the link should be resolved")
+        }
+        is IjentFileSystemWindowsApi -> TODO()
+      }
+    }
   }
 
   internal fun close(uri: URI) {

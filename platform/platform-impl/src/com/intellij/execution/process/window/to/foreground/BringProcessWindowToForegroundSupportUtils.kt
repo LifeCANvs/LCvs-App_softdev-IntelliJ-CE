@@ -1,3 +1,4 @@
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.execution.process.window.to.foreground
 
 import com.intellij.openapi.util.*
@@ -12,7 +13,7 @@ private val terminalPIDKey = Key<UInt?>("ProcessWindowUtils_TerminalPIDKey")
 private val terminalBroughtSuccessfullyKey = Key<Boolean>("ProcessWindowUtils_TerminalBroughtSuccessfullyKey")
 
 @ApiStatus.Internal
-fun BringProcessWindowToForegroundSupport.bring(pid: UInt, dataHolder: UserDataHolderEx) : Boolean {
+fun BringProcessWindowToForegroundSupport.bring(pid: UInt, dataHolder: UserDataHolderEx, tryExternalTerminalApp: Boolean) : Boolean {
   if (!this.isApplicable())
     return false
 
@@ -20,6 +21,8 @@ fun BringProcessWindowToForegroundSupport.bring(pid: UInt, dataHolder: UserDataH
     logger.trace { "Could successfully bring $pid process into foreground" }
     return true
   }
+
+  if (!tryExternalTerminalApp) return false
 
   logger.trace { "Bringing terminal window into foreground if it exists" }
 
@@ -35,10 +38,10 @@ private fun BringProcessWindowToForegroundSupport.tryBringTerminalWindow(dataHol
   // on windows WindowsTerminal.exe process is not a parent of the debuggee, so we have to find the terminal windows associated with the debuggee first
     return (this as WinBringProcessWindowToForegroundSupport).tryBringWindowsTerminalInForeground(dataHolder, pid)
   else
-    when (val terminalPid = dataHolder.getOrCreateUserData(terminalPIDKey) {
+    when (val terminalPid = dataHolder.getOrMaybeCreateUserData(terminalPIDKey) {
       (tryFindParentProcess(pid, listOf("MacOS/Terminal", "gnome-terminal")) ?: run {
         logger.trace { "Could find neither main window of $pid process, nor parent cmd process. Exiting" };
-        return@getOrCreateUserData null
+        return@getOrMaybeCreateUserData null
       }
       ).pid().toUInt()
     }) {
@@ -76,7 +79,7 @@ private fun WinBringProcessWindowToForegroundSupport.tryBringWindowsTerminalInFo
   }
 
   // On windows only 1 instance of terminal can be launched
-  val windowsTerminalPid = dataHolder.getOrCreateUserData(terminalPIDKey) {
+  val windowsTerminalPid = dataHolder.getOrCreateUserDataUnsafe(terminalPIDKey) {
     ProcessHandle.allProcesses()
       .filter {
         val command = it.info().command().getOrNull() ?: return@filter false

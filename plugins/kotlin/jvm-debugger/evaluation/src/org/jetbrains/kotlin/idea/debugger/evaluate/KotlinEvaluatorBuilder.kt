@@ -18,7 +18,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.sun.jdi.*
-import com.sun.jdi.Value
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.eval4j.*
@@ -46,6 +45,7 @@ import org.jetbrains.kotlin.idea.util.application.merge
 import org.jetbrains.kotlin.psi.KtCodeFragment
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.org.objectweb.asm.ClassReader
+import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.tree.ClassNode
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -264,6 +264,15 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
                 override fun jdiNewArray(arrayType: ArrayType, size: Int): ArrayReference {
                     return DebuggerUtilsEx.mirrorOfArray(arrayType, size, context.evaluationContext)
                 }
+
+                override fun shouldInvokeMethodWithReflection(method: Method, args: List<Value?>): Boolean {
+                    // invokeMethod in ExecutionContext already handles everything
+                    return false
+                }
+
+                override fun loadType(classType: Type, classLoader: ClassLoaderReference?): ReferenceType {
+                    return context.debugProcess.findClass(context.evaluationContext, classType.className, classLoader)
+                }
             }
             interpreterLoop(mainMethod, makeInitialFrame(mainMethod, args.map { it.asValue() }), eval)
         }
@@ -319,7 +328,7 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
         val args = valueParameters.zip(asmValueParameters)
 
         return args.map { (parameter, asmType) ->
-            val result = variableFinder.find(parameter, asmType)
+            val result = variableFinder.find(parameter, asmType, codeFragment)
 
             if (result == null) {
                 val name = parameter.debugString
@@ -385,11 +394,11 @@ class KotlinEvaluator(val codeFragment: KtCodeFragment, private val sourcePositi
             }
 
             val sharedVar = if ((jdiValue is AbstractValue<*>)) getValueIfSharedVar(jdiValue) else null
-            return sharedVar?.value ?: jdiValue.asJdiValue(context.vm.virtualMachine, jdiValue.asmType)
+            return sharedVar?.value ?: jdiValue.asJdiValue(context.vm.virtualMachine) { jdiValue.asmType }
         }
 
         private fun getValueIfSharedVar(value: Eval4JValue): VariableFinder.Result? {
-            val obj = value.obj(value.asmType) as? ObjectReference ?: return null
+            val obj = value.obj { value.asmType } as? ObjectReference ?: return null
             return VariableFinder.Result(EvaluatorValueConverter.unref(obj))
         }
     }

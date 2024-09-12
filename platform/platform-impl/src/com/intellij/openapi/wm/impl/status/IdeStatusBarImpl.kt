@@ -35,7 +35,6 @@ import com.intellij.openapi.wm.StatusBarWidget.*
 import com.intellij.openapi.wm.WidgetPresentation
 import com.intellij.openapi.wm.ex.ProgressIndicatorEx
 import com.intellij.openapi.wm.ex.StatusBarEx
-import com.intellij.openapi.wm.impl.ProjectFrameHelper
 import com.intellij.openapi.wm.impl.status.TextPanel.WithIconAndArrows
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsActionGroup
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
@@ -80,11 +79,12 @@ private val WIDGET_ID = Key.create<String>("STATUS_BAR_WIDGET_ID")
 private val minIconHeight: Int
   get() = JBUIScale.scale(18 + 1 + 1)
 
-open class IdeStatusBarImpl internal constructor(
-  private val coroutineScope: CoroutineScope,
-  private val frameHelper: ProjectFrameHelper,
+open class IdeStatusBarImpl @ApiStatus.Internal constructor(
+  parentCs: CoroutineScope,
+  private val getProject : () -> Project?,
   addToolWindowWidget: Boolean,
 ) : JComponent(), Accessible, StatusBarEx, UiDataProvider {
+  private val coroutineScope = parentCs.childScope("IdeStatusBarImpl", supervisor = false)
   private var infoAndProgressPanel: InfoAndProgressPanel? = null
 
   internal enum class WidgetEffect {
@@ -104,7 +104,7 @@ open class IdeStatusBarImpl internal constructor(
 
   private var preferredTextHeight: Int = 0
 
-  private var editorProvider: () -> FileEditor? = createDefaultEditorProvider(frameHelper)
+  private var editorProvider: () -> FileEditor? = createDefaultEditorProvider()
 
   @Volatile
   private var children = persistentHashSetOf<IdeStatusBarImpl>()
@@ -139,7 +139,7 @@ open class IdeStatusBarImpl internal constructor(
   @RequiresEdt
   override fun createChild(coroutineScope: CoroutineScope, frame: IdeFrame, editorProvider: () -> FileEditor?): StatusBar {
     EDT.assertIsEdt()
-    val bar = IdeStatusBarImpl(frameHelper = frameHelper, addToolWindowWidget = false, coroutineScope = coroutineScope)
+    val bar = IdeStatusBarImpl(parentCs = coroutineScope, getProject = ::project, addToolWindowWidget = false)
     bar.editorProvider = editorProvider
     bar.isVisible = isVisible
     synchronized(this) {
@@ -700,7 +700,7 @@ open class IdeStatusBarImpl internal constructor(
   fun getWidgetComponent(id: String): JComponent? = widgetMap.get(id)?.component
 
   override val project: Project?
-    get() = frameHelper.project
+    get() = getProject()
 
   override val currentEditor: () -> FileEditor?
     get() = editorProvider
@@ -712,7 +712,14 @@ open class IdeStatusBarImpl internal constructor(
 
   @ApiStatus.Internal
   fun resetEditorProvider() {
-    editorProvider = createDefaultEditorProvider(frameHelper)
+    editorProvider = createDefaultEditorProvider()
+  }
+
+  private fun createDefaultEditorProvider(): () -> FileEditor? {
+    return p@{
+      val project = project ?: return@p null
+      project.service<StatusBarWidgetsManager>().dataContext.currentFileEditor.value
+    }
   }
 
   override fun getAccessibleContext(): AccessibleContext {
@@ -877,13 +884,6 @@ private fun wrapCustomStatusBarWidget(widget: CustomStatusBarWidget): JComponent
     component
   }
   return result
-}
-
-private fun createDefaultEditorProvider(frameHelper: ProjectFrameHelper): () -> FileEditor? {
-  return p@{
-    val project = frameHelper.project ?: return@p null
-    project.service<StatusBarWidgetsManager>().dataContext.currentFileEditor.value
-  }
 }
 
 private class IconPresentationComponent(private val presentation: IconPresentation) : WithIconAndArrows(presentation::getTooltipText),

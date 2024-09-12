@@ -6,9 +6,10 @@ import javax.swing.JViewport
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 class Zoom {
-  private var userScale = -1.0
+  private var userScale = INITIAL_SCALE
   private var dynamicScale = 24.0
 
   private var correctionDuration: Long = 0
@@ -43,10 +44,21 @@ class Zoom {
     }
   }
 
+  fun increase(viewport: JViewport) = adjustUser(viewport, viewport.getMiddlePoint(), ZOOM_IN_MULTIPLIER)
+
+  fun decrease(viewport: JViewport) = adjustUser(viewport, viewport.getMiddlePoint(), ZOOM_OUT_MULTIPLIER)
+
+  fun reset(viewport: JViewport) {
+    userScale = INITIAL_SCALE
+    adjustUser(viewport, viewport.getMiddlePoint(), 1.0)
+  }
+
+  private fun JViewport.getMiddlePoint(): Int = viewPosition.x + width / 2
+
   internal fun shouldCacheImage() = System.currentTimeMillis() - lastCorrectionTime > ZOOM_CACHING_DELAY
 
   private fun correctedViewPosition(newPosition: Double, x: Int, duration: Long): Int {
-    val correctedX = Math.round(max(0.0, newPosition)).toInt()
+    val correctedX = max(0.0, newPosition).roundToInt()
     val index = listOf(abs(duration - toDuration(correctedX + x)),
                        abs(duration - toDuration(correctedX + x + 1)),
                        abs(duration - toDuration(correctedX + x - 1)),
@@ -63,12 +75,12 @@ class Zoom {
     }
   }
 
-  private fun scale(): Double = max(MIN_ZOOM_SECONDS, min(MAX_ZOOM_SECONDS, if (userScale == -1.0) dynamicScale else userScale))
+  private fun scale(): Double = max(MIN_ZOOM_SECONDS, min(MAX_ZOOM_SECONDS, if (userScale == INITIAL_SCALE) dynamicScale else userScale))
 
   fun adjustDynamic(totalDuration: Int, window: Int) = adjustDynamic(totalDuration.toDouble(), window.toDouble())
 
   fun adjustDynamic(totalDuration: Double, window: Double) {
-    dynamicScale = max(normalize(secondsToScale(totalDuration / NANOS, Math.round(window - 10).toInt())),
+    dynamicScale = max(normalize(secondsToScale(totalDuration / NANOS, (window - 10).roundToInt())),
                        secondsToScale(60.0, AXIS_DISTANCE_PX))
   }
 
@@ -78,5 +90,8 @@ class Zoom {
 
   companion object {
     private const val NANOS: Long = 1_000_000_000
+    private const val INITIAL_SCALE: Double = -1.0
+    private const val ZOOM_IN_MULTIPLIER: Double = 1.1
+    private const val ZOOM_OUT_MULTIPLIER: Double = 0.9
   }
 }

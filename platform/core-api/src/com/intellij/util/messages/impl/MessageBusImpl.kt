@@ -4,8 +4,10 @@
 package com.intellij.util.messages.impl
 
 import com.intellij.codeWithMe.ClientId
+import com.intellij.concurrency.resetThreadContext
 import com.intellij.diagnostic.PluginException
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.isMessageBusErrorPropagationEnabled
 import com.intellij.openapi.application.isMessageBusThrowsWhenDisposed
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
@@ -49,16 +51,20 @@ open class MessageBusImpl : MessageBus {
 
   @JvmField
   internal val publisherCache: ConcurrentMap<Topic<*>, Any> = ConcurrentHashMap()
+
   @JvmField
   internal val subscribers: ConcurrentLinkedQueue<MessageHandlerHolder> = ConcurrentLinkedQueue<MessageHandlerHolder>()
 
   // caches subscribers for this bus and its children or parents, depending on the topic's broadcast policy
   @JvmField
   internal val subscriberCache: ConcurrentMap<Topic<*>, Array<Any?>> = ConcurrentHashMap()
+
   @JvmField
   internal val parentBus: CompositeMessageBus?
+
   @JvmField
   internal val rootBus: RootBus
+
   @JvmField
   internal val owner: MessageBusOwner
 
@@ -66,6 +72,7 @@ open class MessageBusImpl : MessageBus {
 
   // separate disposable must be used, because container will dispose bus connections in a separate step
   private var connectionDisposable: Disposable? = Disposer.newDisposable()
+
   @JvmField
   internal var messageDeliveryListeners: MutableSet<MessageDeliveryListener> = ConcurrentHashMap.newKeySet()
 
@@ -122,7 +129,7 @@ open class MessageBusImpl : MessageBus {
     return connection
   }
 
-  override fun <L  : Any> syncPublisher(topic: Topic<L>): L {
+  override fun <L : Any> syncPublisher(topic: Topic<L>): L {
     if (isDisposed) {
       PluginException.logPluginError(LOG, "Already disposed: $this", null, topic.javaClass)
     }
@@ -431,7 +438,7 @@ private fun pumpWaiting(jobQueue: MessageQueue) {
 }
 
 private fun deliverMessage(job: Message, jobQueue: MessageQueue, prevError: Throwable?): Throwable? {
-  ClientId.withClientId(job.clientId).use {
+  ClientId.withExplicitClientId(job.clientId).use {
     jobQueue.current = job
     val handlers = job.handlers
     var error = prevError
@@ -462,8 +469,10 @@ private fun deliverMessage(job: Message, jobQueue: MessageQueue, prevError: Thro
   }
 }
 
-internal open class MessagePublisher<L>(@JvmField protected val topic: Topic<L>,
-                                        @JvmField protected val bus: MessageBusImpl) : InvocationHandler {
+internal open class MessagePublisher<L>(
+  @JvmField protected val topic: Topic<L>,
+  @JvmField protected val bus: MessageBusImpl,
+) : InvocationHandler {
   final override fun invoke(proxy: Any, method: Method, args: Array<Any?>?): Any? {
     if (method.declaringClass == Any::class.java) {
       return EventDispatcher.handleObjectMethod(proxy, args, method.name)
@@ -503,13 +512,15 @@ internal open class MessagePublisher<L>(@JvmField protected val topic: Topic<L>,
 }
 
 @Internal
-internal fun executeOrAddToQueue(topic: Topic<*>,
-                                 method: Method,
-                                 args: Array<Any?>?,
-                                 handlers: Array<Any?>,
-                                 jobQueue: MessageQueue?,
-                                 prevError: Throwable?,
-                                 bus: MessageBusImpl): Throwable? {
+internal fun executeOrAddToQueue(
+  topic: Topic<*>,
+  method: Method,
+  args: Array<Any?>?,
+  handlers: Array<Any?>,
+  jobQueue: MessageQueue?,
+  prevError: Throwable?,
+  bus: MessageBusImpl,
+): Throwable? {
   val methodHandle = MethodHandleCache.compute(method, args)
   if (jobQueue == null) {
     var error = prevError
@@ -669,13 +680,15 @@ private fun deliverImmediately(connection: MessageBusConnectionImpl, jobs: Deque
   return newJobs
 }
 
-private fun invokeListener(methodHandle: MethodHandle,
-                           methodName: String,
-                           args: Array<Any?>?,
-                           topic: Topic<*>,
-                           handler: Any,
-                           messageDeliveryListeners: Set<MessageDeliveryListener>,
-                           prevError: Throwable?): Throwable? {
+private fun invokeListener(
+  methodHandle: MethodHandle,
+  methodName: String,
+  args: Array<Any?>?,
+  topic: Topic<*>,
+  handler: Any,
+  messageDeliveryListeners: Set<MessageDeliveryListener>,
+  prevError: Throwable?,
+): Throwable? {
   try {
     //println("${topic.displayName} ${topic.isImmediateDelivery}: $methodName(${args.contentToString()})")
     if (handler is MessageHandler) {
@@ -689,32 +702,50 @@ private fun invokeListener(methodHandle: MethodHandle,
       invokeMethod(handler, args, methodHandle)
       messageDeliveryListeners.forEach { it.messageDelivered(topic, methodName, handler, System.nanoTime() - startTime) }
     }
+    return prevError
   }
-  catch (e: AbstractMethodError) {
+  catch (_: AbstractMethodError) {
     // do nothing for AbstractMethodError - this listener just does not implement something newly added yet
+    return prevError
   }
-  catch (e: Throwable) {
-    // ProcessCanceledException is rethrown only after executing all handlers
-    val error = if (e is ProcessCanceledException || e is AssertionError || e is CancellationException) {
-      e
+  catch (e: CancellationException) {
+    if (isMessageBusErrorPropagationEnabled) {
+      // CancellationException is rethrown only after executing all handlers
+      return mergeErrors(prevError, e)
     }
     else {
-      RuntimeException("Cannot invoke (" +
-                       "class=${handler::class.java.simpleName}, " +
-                       "method=${methodName}, " +
-                       "topic=${topic.displayName}" +
-                       ")", e)
-    }
-
-    if (prevError == null) {
-      return error
-    }
-    else {
-      prevError.addSuppressed(error)
+      // ignore cancellation exception
       return prevError
     }
   }
-  return prevError
+  catch (e: Throwable) {
+    val detailedError = when (e) {
+      is AssertionError -> e
+      else -> RuntimeException("Cannot invoke (" +
+                               "class=${handler::class.java.simpleName}, " +
+                               "method=${methodName}, " +
+                               "topic=${topic.displayName}" +
+                               ")", e)
+    }
+
+    if (isMessageBusErrorPropagationEnabled) {
+      return mergeErrors(prevError, detailedError)
+    }
+    else {
+      MessageBusImpl.LOG.error(e)
+      return prevError
+    }
+  }
+}
+
+private fun mergeErrors(prevError: Throwable?, newError: Throwable): Throwable {
+  if (prevError == null) {
+    return newError
+  }
+  else {
+    prevError.addSuppressed(newError)
+    return prevError
+  }
 }
 
 private fun invokeMethod(handler: Any, args: Array<Any?>?, methodHandle: MethodHandle) {
@@ -727,6 +758,8 @@ private fun invokeMethod(handler: Any, args: Array<Any?>?, methodHandle: MethodH
 }
 
 internal fun throwError(error: Throwable) {
+  MessageBusImpl.LOG.assertTrue(isMessageBusErrorPropagationEnabled)
+
   val suppressed = error.suppressed
   if (suppressed.size > 1) {
     suppressed.firstOrNull { it is ProcessCanceledException || it is CancellationException }?.let { throw it }

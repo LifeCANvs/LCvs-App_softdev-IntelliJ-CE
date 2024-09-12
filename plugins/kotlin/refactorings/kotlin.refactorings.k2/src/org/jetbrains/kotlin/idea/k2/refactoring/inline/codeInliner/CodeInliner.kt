@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
+import org.jetbrains.kotlin.analysis.api.types.KaFlexibleType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.idea.base.codeInsight.KotlinDeclarationNameValidator
@@ -49,8 +50,8 @@ class CodeInliner(
     private val usageExpression: KtSimpleNameExpression?,
     private val call: KtElement,
     private val inlineSetter: Boolean,
-    codeToInline: CodeToInline
-) : AbstractCodeInliner<KtElement, KtParameter, KaType, KtDeclaration>(call, codeToInline) {
+    private val replacement: CodeToInline
+) : AbstractCodeInliner<KtElement, KtParameter, KaType, KtDeclaration>(call, replacement) {
     private val mapping: Map<KtExpression, Name>? = analyze(call) {
         treeUpToCall().resolveToCall()?.singleFunctionCallOrNull()?.argumentMapping?.mapValues { e -> e.value.name }
     }
@@ -74,9 +75,11 @@ class CodeInliner(
             ?.getAssignmentByLHS()
             ?.takeIf { it.operationToken == KtTokens.EQ }
         val originalDeclaration = analyze(call) {
+            //it might resolve in java method which is converted to kotlin by j2k
+            //the originalDeclaration in this case should point to the converted non-physical function
             (call.parent as? KtCallableReferenceExpression
                 ?: treeUpToCall())
-                .resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol?.symbol?.psi as? KtDeclaration
+                .resolveToCall()?.singleCallOrNull<KaCallableMemberCall<*, *>>()?.partiallyAppliedSymbol?.symbol?.psi as? KtDeclaration ?: replacement.originalDeclaration
         } ?: return null
         val callableForParameters = (if (assignment != null && originalDeclaration is KtProperty)
             originalDeclaration.setter?.takeIf { inlineSetter && it.hasBody() } ?: originalDeclaration
@@ -123,7 +126,7 @@ class CodeInliner(
             receiver?.let {
                 analyze(it) {
                     val type = it.expressionType
-                    type to (type?.nullability == KaTypeNullability.NULLABLE)
+                    type to (type?.nullability == KaTypeNullability.NULLABLE || type is KaFlexibleType && type.upperBound.nullability == KaTypeNullability.NULLABLE)
                 }
             }
 
@@ -138,7 +141,9 @@ class CodeInliner(
                         symbol is KaClassSymbol && symbol.classKind.isObject && symbol.name != null -> symbol.name!!.asString()
                         symbol is KaClassifierSymbol && symbol !is KaAnonymousObjectSymbol -> "this@" + symbol.name!!.asString()
                         symbol is KaReceiverParameterSymbol -> {
-                            symbol.owningCallableSymbol.callableId?.callableName?.asString()?.let { "this@$it" } ?: "this"
+                            val name = (symbol.psi as? KtFunctionLiteral)?.findLabelAndCall()?.first
+                                ?: symbol.owningCallableSymbol.callableId?.callableName
+                            name?.asString()?.let { "this@$it" } ?: "this"
                         }
                         else -> "this"
                     }

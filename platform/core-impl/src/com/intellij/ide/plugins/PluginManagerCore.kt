@@ -9,8 +9,9 @@ import com.intellij.diagnostic.Activity
 import com.intellij.diagnostic.CoroutineTracerShim
 import com.intellij.diagnostic.LoadingState
 import com.intellij.ide.plugins.DisabledPluginsState.Companion.invalidate
+import com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
+import com.intellij.ide.plugins.PluginManagerCore.write3rdPartyPlugins
 import com.intellij.ide.plugins.cl.PluginClassLoader
-import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.impl.ApplicationInfoImpl
 import com.intellij.openapi.diagnostic.Logger
@@ -19,7 +20,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.BuildNumber
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.SystemInfoRt
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.openapi.util.text.HtmlChunk
@@ -44,8 +44,9 @@ import java.nio.file.*
 import java.util.*
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
-import java.util.function.*
+import java.util.function.Supplier
 import javax.swing.JOptionPane
+import kotlin.Throws
 import kotlin.io.path.name
 import kotlin.streams.asSequence
 
@@ -645,24 +646,30 @@ object PluginManagerCore {
     pluginSetBuilder.checkPluginCycles(globalErrors)
     val pluginsToDisable = HashMap<PluginId, String>()
     val pluginsToEnable = HashMap<PluginId, String>()
-    pluginSetBuilder.computeEnabledModuleMap { descriptor ->
+    
+    fun registerLoadingError(loadingError: PluginLoadingError) {
+      pluginErrorsById.put(loadingError.plugin.pluginId, loadingError)
+      pluginsToDisable.put(loadingError.plugin.pluginId, loadingError.plugin.name)
+      val disabledDependencyId = loadingError.disabledDependency
+      if (disabledDependencyId != null && context.disabledPlugins.contains(disabledDependencyId)) {
+        pluginsToEnable.put(disabledDependencyId, idMap.get(disabledDependencyId)!!.getName())
+      }
+    }
+
+    val additionalErrors = pluginSetBuilder.computeEnabledModuleMap { descriptor ->
       val disabledPlugins = context.disabledPlugins
       val loadingError = pluginSetBuilder.initEnableState(descriptor = descriptor,
                                                           idMap = idMap,
                                                           disabledPlugins = disabledPlugins,
                                                           errors = pluginErrorsById)
-      val pluginId = descriptor.getPluginId()
-      val isLoadable = loadingError == null
-      if (!isLoadable) {
-        pluginErrorsById.put(pluginId, loadingError!!)
-        pluginsToDisable.put(pluginId, descriptor.getName())
-        val disabledDependencyId = loadingError.disabledDependency
-        if (disabledDependencyId != null && disabledPlugins.contains(disabledDependencyId)) {
-          pluginsToEnable.put(disabledDependencyId, idMap.get(disabledDependencyId)!!.getName())
-        }
+      if (loadingError != null) {
+        registerLoadingError(loadingError)
       }
-      descriptor.isEnabled = (descriptor.isEnabled() && isLoadable && !context.expiredPlugins.contains(pluginId))
+      descriptor.isEnabled = descriptor.isEnabled() && loadingError == null && !context.expiredPlugins.contains(descriptor.getPluginId())
       !descriptor.isEnabled()
+    }
+    for (loadingError in additionalErrors) {
+      registerLoadingError(loadingError)
     }
 
     val actions = prepareActions(pluginNamesToDisable = pluginsToDisable.values, pluginNamesToEnable = pluginsToEnable.values)
@@ -814,7 +821,7 @@ object PluginManagerCore {
   private fun ask3rdPartyPluginsPrivacyConsent(descriptors: List<IdeaPluginDescriptorImpl>): Boolean {
     val title = CoreBundle.message("third.party.plugins.privacy.note.title")
     val pluginList = descriptors.joinToString(separator = "<br>") { "&nbsp;&nbsp;&nbsp;${getPluginNameAndVendor(it)}" }
-    val text = CoreBundle.message("third.party.plugins.privacy.note.text", pluginList, ApplicationInfo.getInstance().shortCompanyName)
+    val text = CoreBundle.message("third.party.plugins.privacy.note.text", pluginList, ApplicationInfoImpl.getShadowInstance().shortCompanyName)
     val buttons = arrayOf(CoreBundle.message("third.party.plugins.privacy.note.accept"),
                           CoreBundle.message("third.party.plugins.privacy.note.disable"))
     val choice = JOptionPane.showOptionDialog(null, text, title, JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE,

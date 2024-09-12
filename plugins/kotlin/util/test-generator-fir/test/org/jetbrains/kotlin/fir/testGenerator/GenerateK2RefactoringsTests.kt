@@ -62,19 +62,7 @@ internal fun MutableTWorkspace.generateK2RefactoringsTests() {
     }
     testGroup("refactorings/kotlin.refactorings.tests.k2", category = INLINE_REFACTORING, testDataPath = "../../idea/tests/testData") {
         testClass<AbstractKotlinFirInlineTest> {
-            model("refactoring/inline/inlineVariableOrProperty", isRecursive = false, pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineVariableOrProperty/addParenthesis", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineVariableOrProperty/explicateParameterTypes", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineVariableOrProperty/explicateTypeArgument", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineVariableOrProperty/property", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineVariableOrProperty/stringTemplates", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/namedFunction", isRecursive = false, pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/namedFunction/expressionBody", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/namedFunction/fromIntellij", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/namedFunction/returnAtEnd", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/anonymousFunction", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/lambdaExpression", pattern = Patterns.KT_WITHOUT_DOTS)
-            model("refactoring/inline/inlineTypeAlias", pattern = Patterns.KT_WITHOUT_DOTS)
+            model("refactoring/inline", pattern = Patterns.KT_WITHOUT_DOTS, excludedDirectories = listOf("withFullJdk"))
         }
     }
     testGroup("refactorings/kotlin.refactorings.tests.k2", category = EXTRACT_REFACTORING, testDataPath = "../../idea/tests/testData") {
@@ -92,6 +80,7 @@ internal fun MutableTWorkspace.generateK2RefactoringsTests() {
 
         testClass<AbstractK2IntroduceParameterTest> {
             model("refactoring/introduceParameter", pattern = Patterns.KT_OR_KTS_WITHOUT_DOTS, testMethodName = "doIntroduceParameterTest")
+            model("refactoring/introduceJavaParameter", pattern = Patterns.JAVA, testMethodName = "doIntroduceJavaParameterTest")
             model("refactoring/introduceLambdaParameter", pattern = Patterns.KT_OR_KTS_WITHOUT_DOTS, testMethodName = "doIntroduceFunctionalParameterTest")
         }
 

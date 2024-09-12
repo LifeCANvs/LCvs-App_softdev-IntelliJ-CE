@@ -15,9 +15,9 @@ val COLOR_PRODUCTION_BLOCK_DISABLED: JBColor = JBColor(Color(0xd7e4fd), Color(0x
 val COLOR_PRODUCTION_BORDER: JBColor = JBColor(Color(0x4781fa), Color(0x4978d6))
 val COLOR_PRODUCTION_BORDER_SELECTED: JBColor = JBColor.BLUE
 
-val COLOR_BACKGROUND: JBColor = JBColor.WHITE
+val COLOR_BACKGROUND: Color = JBColor.background()
 val COLOR_BACKGROUND_ODD: JBColor = JBColor.WHITE
-val COLOR_BACKGROUND_EVEN: JBColor = JBColor(Color(0xfefefe), Color(0x3e4042))
+val COLOR_BACKGROUND_EVEN: JBColor = JBColor(Color(0xeeeeee), Color(0x3e4042))
 
 val COLOR_TEXT: JBColor = JBColor(Color(0x1d1d1d), Color(0xbfbfbf))
 val COLOR_LINE: JBColor = JBColor.LIGHT_GRAY
@@ -46,3 +46,6 @@ const val MAX_ZOOM_SECONDS = 1_000.0
 const val MAX_WIDTH = 10_000.0
 
 const val ZOOM_CACHING_DELAY = 50
+const val BUFFERED_IMAGE_WIDTH_PX = 512
+const val IMAGE_CACHE_ACTIVATION_COUNT = 8
+const val REFRESH_TIMEOUT_SECONDS = 1L

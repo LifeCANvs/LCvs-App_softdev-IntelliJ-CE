@@ -266,6 +266,7 @@ public final class RunnerContentUi implements ContentUI, Disposable, CellTransfo
     tabs = new JBRunnerTabs(myProject, this) {
       @Override
       public void uiDataSnapshot(@NotNull DataSink sink) {
+        super.uiDataSnapshot(sink);
         TabInfo info = tabs.getTargetInfo();
         sink.set(CONTENT_KEY, info == null ? null : getGridFor(info).getContents().toArray(new Content[0]));
         sink.set(CONTEXT_KEY, RunnerContentUi.this);
@@ -320,9 +321,8 @@ public final class RunnerContentUi implements ContentUI, Disposable, CellTransfo
     tabs.addTabMouseListener(new MouseAdapter() {
       @Override
       public void mousePressed(@NotNull MouseEvent e) {
-        if (!UIUtil.isCloseClick(e) || !e.isConsumed()) {
-          return;
-        }
+        if (e.isConsumed()) return;
+        if (!UIUtil.isCloseClick(e)) return;
         TabInfo tabInfo = tabs.findInfo(e);
         GridImpl grid = tabInfo == null ? null : getGridFor(tabInfo);
         Content[] contents = grid != null ? grid.getContents().toArray(new Content[0]) : null;
@@ -1936,13 +1936,9 @@ public final class RunnerContentUi implements ContentUI, Disposable, CellTransfo
   @Override
   public @NotNull List<AnAction> getActions(boolean originalProvider) {
     ArrayList<AnAction> result = new ArrayList<>();
-    if (myLeftToolbarActions != null) {
-      AnAction[] kids = myLeftToolbarActions.getChildren(null);
-      ContainerUtil.addAll(result, kids);
-    }
-    if (myTopLeftActions != null && UIExperiment.isNewDebuggerUIEnabled()) {
-      AnAction[] kids = myTopLeftActions.getChildren(null);
-      ContainerUtil.addAll(result, kids);
+    ContainerUtil.addIfNotNull(result, myLeftToolbarActions);
+    if (UIExperiment.isNewDebuggerUIEnabled()) {
+      ContainerUtil.addIfNotNull(result, myTopLeftActions);
     }
     return result;
   }
@@ -1971,7 +1967,8 @@ public final class RunnerContentUi implements ContentUI, Disposable, CellTransfo
     @Override
     public void dragOutStarted(@NotNull MouseEvent mouseEvent, @NotNull TabInfo info) {
       JComponent component = info.getComponent();
-      Content[] data = CONTENT_KEY.getData((DataProvider)component);
+      DataContext dataContext = DataManager.getInstance().getDataContext(component);
+      Content[] data = CONTENT_KEY.getData(dataContext);
       assert data != null;
       storeDefaultIndices(data);
 

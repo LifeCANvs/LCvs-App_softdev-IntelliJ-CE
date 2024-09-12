@@ -12,10 +12,13 @@ import com.intellij.codeInsight.daemon.impl.grave.CodeVisionNecromancy
 import com.intellij.codeInsight.daemon.impl.grave.CodeVisionZombie
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readActionBlocking
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.editor.impl.zombie.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.MarkupType
 import com.intellij.psi.PsiManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +75,10 @@ private class CodeVisionNecromancer(
         val editor = recipe.editorSupplier()
         withContext(Dispatchers.EDT) {
           if (recipe.isValid(editor)) {
-            editor.lensContext?.setZombieResults(entries)
+            writeIntentReadAction {
+              FUSProjectHotStartUpMeasurer.markupRestored(recipe, MarkupType.CODE_VISION)
+              editor.lensContext?.setZombieResults(entries)
+            }
           }
         }
       }
@@ -84,7 +90,9 @@ private class CodeVisionNecromancer(
       if (placeholders.isNotEmpty()) {
         withContext(Dispatchers.EDT) {
           if (!editor.isDisposed) {
-            editor.lensContext?.setResults(placeholders)
+            writeIntentReadAction {
+              editor.lensContext?.setResults(placeholders)
+            }
           }
         }
       }

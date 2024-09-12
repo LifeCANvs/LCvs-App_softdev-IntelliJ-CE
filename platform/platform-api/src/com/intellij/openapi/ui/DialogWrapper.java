@@ -486,7 +486,14 @@ public abstract class DialogWrapper {
       processDoNotAskOnCancel();
     }
 
-    Disposer.dispose(myDisposable);
+    // Can be called very early when there is no application yet
+    if (LoadingState.COMPONENTS_LOADED.isOccurred()) {
+      //maybe readaction
+      WriteIntentReadAction.run((Runnable)() -> Disposer.dispose(myDisposable));
+    }
+    else {
+      Disposer.dispose(myDisposable);
+    }
   }
 
   public final void close(int exitCode) {

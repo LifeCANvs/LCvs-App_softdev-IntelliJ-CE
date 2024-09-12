@@ -45,6 +45,8 @@ class PyPoetrySdkConfiguration : PyProjectSdkConfigurationExtension {
 
   override fun createAndAddSdkForInspection(module: Module): Sdk? = createAndAddSDk(module, true)
 
+  override fun supportsHeadlessModel(): Boolean = true
+
   private fun createAndAddSDk(module: Module, inspection: Boolean): Sdk? {
     val poetryEnvExecutable = askForEnvData(module, inspection) ?: return null
     PropertiesComponent.getInstance().poetryPath = poetryEnvExecutable.poetryPath.pathString
@@ -53,9 +55,13 @@ class PyPoetrySdkConfiguration : PyProjectSdkConfigurationExtension {
 
   private fun askForEnvData(module: Module, inspection: Boolean): PyAddNewPoetryFromFilePanel.Data? {
     val poetryExecutable = getPoetryExecutable()
+    val isHeadlessEnv = ApplicationManager.getApplication().isHeadlessEnvironment
 
-    if (inspection && validatePoetryExecutable(poetryExecutable) == null) {
+    if ((inspection || isHeadlessEnv) && validatePoetryExecutable(poetryExecutable) == null) {
       return PyAddNewPoetryFromFilePanel.Data(poetryExecutable!!)
+    }
+    else if (isHeadlessEnv) {
+      return null
     }
 
     var permitted = false
@@ -91,13 +97,13 @@ class PyPoetrySdkConfiguration : PyProjectSdkConfigurationExtension {
       return null
     }
 
-    val path = PythonSdkUtil.getPythonExecutable(poetry).also {
+    val path = VirtualEnvReader.Instance.findPythonInPythonRoot(Path.of(poetry)).also {
       if (it == null) {
         LOGGER.warn("Python executable is not found: $poetry")
       }
     } ?: return null
 
-    val file = LocalFileSystem.getInstance().refreshAndFindFileByPath(path).also {
+    val file = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.toString()).also {
       if (it == null) {
         LOGGER.warn("Python executable file is not found: $path")
       }

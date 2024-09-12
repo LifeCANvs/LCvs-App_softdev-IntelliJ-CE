@@ -90,6 +90,9 @@ internal class DevKitApplicationPatcher : RunConfigurationExtension() {
     if (vmParametersAsList.none { it.startsWith("-XX:ReservedCodeCacheSize") }) {
       vmParameters.add("-XX:ReservedCodeCacheSize=512m")
     }
+    if (vmParametersAsList.none { it.startsWith("-Djava.util.zip.use.nio.for.zip.file.access") }) {
+      vmParameters.add("-Djava.util.zip.use.nio.for.zip.file.access=true") // IJPL-149160
+    }
 
     enableIjentDefaultFsProvider(project, configuration, vmParameters)
 
@@ -103,16 +106,15 @@ internal class DevKitApplicationPatcher : RunConfigurationExtension() {
     configuration: JavaRunConfigurationBase,
     vmParameters: ParametersList,
   ) {
-    if (!isIjentWslFsEnabledByDefaultForProduct(vmParameters.getPropertyValue("idea.platform.prefix"))) return
-
     // Enable the IJent file system only when the new default FS provider class is available.
     // It is required to let actual DevKit plugins work with branches without the FS provider class, like 241.
     if (JUnitDevKitPatcher.loaderValid(project, null, IJENT_REQUIRED_DEFAULT_NIO_FS_PROVIDER_CLASS)) {
-      vmParameters.addAll(ENABLE_IJENT_WSL_FILE_SYSTEM_VMOPTIONS)
-      vmParameters.add("-Xbootclasspath/a:${configuration.workingDirectory}/out/classes/production/$IJENT_BOOT_CLASSPATH_MODULE")
-    }
-    else {
-      vmParameters.add("-D${IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY}=false")
+      val isIjentWslFsEnabled = isIjentWslFsEnabledByDefaultForProduct(vmParameters.getPropertyValue("idea.platform.prefix"))
+      vmParameters.add("-D${IJENT_WSL_FILE_SYSTEM_REGISTRY_KEY}=$isIjentWslFsEnabled")
+      if (isIjentWslFsEnabled) {
+        vmParameters.addAll(MULTI_ROUTING_FILE_SYSTEM_VMOPTIONS)
+        vmParameters.add("-Xbootclasspath/a:${configuration.workingDirectory}/out/classes/production/$IJENT_BOOT_CLASSPATH_MODULE")
+      }
     }
   }
 

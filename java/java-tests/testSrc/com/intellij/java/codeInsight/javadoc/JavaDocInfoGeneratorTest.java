@@ -1,4 +1,4 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeInsight.javadoc;
 
 import com.intellij.JavaTestUtil;
@@ -81,6 +81,7 @@ public class JavaDocInfoGeneratorTest extends JavaCodeInsightTestCase {
   public void testMethodTypeParameter3() { doTestAtCaret(); }
   public void testInheritedDocInThrows() { doTestMethod(); }
   public void testInheritedDocInThrows1() { doTestMethod(); }
+  public void testMultipleThrowsSameType() { doTestMethod(); }
   public void testEscapeValues() { doTestClass(); }
   public void testClassTypeParameter() { doTestClass(); }
   public void testClassTypeParameter1() { doTestClass(); }
@@ -183,6 +184,34 @@ public class JavaDocInfoGeneratorTest extends JavaCodeInsightTestCase {
   public void testUnknownTag() { doTestMethod(); }
   public void testUnknownClassTag() { doTestClass(); }
   public void testReflectConstructor() { useJava10(); doTestAtCaret(); }
+  public void testMarkdownGeneralFeatures() { doTestClass(); }
+  public void testMarkdownCodeBlock(){ doTestClass(); }
+  public void testMarkdownReferenceLink(){ doTestClass(); }
+  public void testMarkdownInheritDoc() {
+    configureByFile();
+    PsiClass outerClass = ((PsiJavaFile) myFile).getClasses()[1];
+    verifyJavaDoc(outerClass.getMethods()[0]);
+  }
+  public void testMarkdownInlineWithTags(){
+    configureByFile();
+    PsiClass outerClass = ((PsiJavaFile) myFile).getClasses()[0];
+    verifyJavaDoc(outerClass.getMethods()[0]);
+  }
+  public void testMarkdownJepExample(){
+    doTestMethod();
+  }
+  public void testHtmlCodeInMarkdown() {
+    doTestMethod();
+  }
+  public void testMarkdownInlineCodeBlock() { doTestClass(); }
+
+  public void testEscapeHtmlCodesInCodeBlock(){
+    doTestClass();
+  }
+  public void testPreTagLeakBeforeCode() {
+    doTestClass();
+  }
+
 
   public void testRepeatableAnnotations() {
     useJava8();

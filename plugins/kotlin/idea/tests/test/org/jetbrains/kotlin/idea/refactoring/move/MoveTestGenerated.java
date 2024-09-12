@@ -164,6 +164,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
             runTest("testData/refactoring/moveFile/kotlin/externalDestructuringUsage/externalDestructuringUsage.test");
         }
 
+        @TestMetadata("kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test")
+        public void testKotlin_innerReferenceWithoutQualifier_InnerReferenceWithoutQualifier() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test");
+        }
+
         @TestMetadata("kotlin/internalReferences/internalReferences.test")
         public void testKotlin_internalReferences_InternalReferences() throws Exception {
             runTest("testData/refactoring/moveFile/kotlin/internalReferences/internalReferences.test");
@@ -172,6 +177,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
         @TestMetadata("kotlin/keepImportAliasRefs/keepImportAliasRefs.test")
         public void testKotlin_keepImportAliasRefs_KeepImportAliasRefs() throws Exception {
             runTest("testData/refactoring/moveFile/kotlin/keepImportAliasRefs/keepImportAliasRefs.test");
+        }
+
+        @TestMetadata("kotlin/langInjection/langInjection.test")
+        public void testKotlin_langInjection_LangInjection() throws Exception {
+            runTest("testData/refactoring/moveFile/kotlin/langInjection/langInjection.test");
         }
 
         @TestMetadata("kotlin/longName/longName.test")
@@ -306,6 +316,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
         @TestMetadata("java/moveTopLevelClassToAnotherPackage/moveTopLevelClassToAnotherPackage.test")
         public void testJava_moveTopLevelClassToAnotherPackage_MoveTopLevelClassToAnotherPackage() throws Exception {
             runTest("testData/refactoring/moveTopLevel/java/moveTopLevelClassToAnotherPackage/moveTopLevelClassToAnotherPackage.test");
+        }
+
+        @TestMetadata("kotlin/callableReference/callableReference.test")
+        public void testKotlin_callableReference_CallableReference() throws Exception {
+            runTest("testData/refactoring/moveTopLevel/kotlin/callableReference/callableReference.test");
         }
 
         @TestMetadata("kotlin/callsAndCallableRefs/internalUsages/differentSourceAndTargetWithFqNames/differentSourceAndTargetWithFqNames.test")
@@ -513,6 +528,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
             runTest("testData/refactoring/moveTopLevel/kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test");
         }
 
+        @TestMetadata("kotlin/moveCollectionLiteralUsage/moveCollectionLiteralUsage.test")
+        public void testKotlin_moveCollectionLiteralUsage_MoveCollectionLiteralUsage() throws Exception {
+            runTest("testData/refactoring/moveTopLevel/kotlin/moveCollectionLiteralUsage/moveCollectionLiteralUsage.test");
+        }
+
         @TestMetadata("kotlin/moveEscapedKeyword/moveEscapedKeyword.test")
         public void testKotlin_moveEscapedKeyword_MoveEscapedKeyword() throws Exception {
             runTest("testData/refactoring/moveTopLevel/kotlin/moveEscapedKeyword/moveEscapedKeyword.test");
@@ -546,6 +566,11 @@ public abstract class MoveTestGenerated extends AbstractMoveTest {
         @TestMetadata("kotlin/moveFunctionWithImportsRetained/moveFunctionWithImportsRetained.test")
         public void testKotlin_moveFunctionWithImportsRetained_MoveFunctionWithImportsRetained() throws Exception {
             runTest("testData/refactoring/moveTopLevel/kotlin/moveFunctionWithImportsRetained/moveFunctionWithImportsRetained.test");
+        }
+
+        @TestMetadata("kotlin/moveMultipleWithComments/moveMultipleWithComments.test")
+        public void testKotlin_moveMultipleWithComments_MoveMultipleWithComments() throws Exception {
+            runTest("testData/refactoring/moveTopLevel/kotlin/moveMultipleWithComments/moveMultipleWithComments.test");
         }
 
         @TestMetadata("kotlin/moveObjectToFile/moveObjectToFile.test")

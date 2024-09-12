@@ -95,6 +95,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
   // subId->Tree state; key may be null
   private final Map<String,TreeState> myReadTreeState = new HashMap<>();
   private final AtomicBoolean myTreeStateRestored = new AtomicBoolean();
+  boolean myNonEmptyTreeStateRestored = false;
   private String mySubId;
   private static final @NonNls String ELEMENT_SUB_PANE = "subPane";
   private static final @NonNls String ATTRIBUTE_SUB_ID = "subId";
@@ -309,14 +310,10 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
     TreePath[] paths = getSelectionPaths();
     Object[] selectedUserObjects =
       paths == null ? ArrayUtil.EMPTY_OBJECT_ARRAY :
-      ArrayUtil.toObjectArray(ContainerUtil.map(paths, TreeUtil::getLastUserObject));
+      ArrayUtil.toObjectArray(ContainerUtil.mapNotNull(paths, TreeUtil::getLastUserObject));
     Object[] singleSelectedPathUserObjects =
       paths == null || paths.length != 1 ? null :
       ArrayUtil.toObjectArray(ContainerUtil.map(paths[0].getPath(), TreeUtil::getUserObject));
-
-    sink.set(PlatformCoreDataKeys.BGT_DATA_PROVIDER,
-             dataId -> getSlowDataFromSelection(
-               selectedUserObjects, singleSelectedPathUserObjects, dataId));
 
     if (paths != null) {
       ArrayList<Navigatable> navigatables = new ArrayList<>();
@@ -336,6 +333,8 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
       sink.set(CommonDataKeys.NAVIGATABLE_ARRAY,
                navigatables.isEmpty() ? null : navigatables.toArray(Navigatable.EMPTY_NAVIGATABLE_ARRAY));
     }
+    uiDataSnapshotForSelection(sink, selectedUserObjects, singleSelectedPathUserObjects);
+
     if (myTreeStructure instanceof AbstractTreeStructureBase treeStructure) {
       List<TreeStructureProvider> providers = treeStructure.getProviders();
       if (providers != null && !providers.isEmpty()) {
@@ -396,34 +395,31 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
     return PsiUtilCore.toPsiElementArray(result);
   }
 
-  @RequiresReadLock(generateAssertion = false)
-  @RequiresBackgroundThread(generateAssertion = false)
-  protected @Nullable Object getSlowDataFromSelection(@Nullable Object @NotNull [] selectedUserObjects,
-                                                      @Nullable Object @Nullable [] singleSelectedPathUserObjects,
-                                                      @NotNull String dataId) {
-    if (CommonDataKeys.PSI_ELEMENT.is(dataId)) {
+  protected void uiDataSnapshotForSelection(@NotNull DataSink sink, @Nullable Object @NotNull [] selectedUserObjects,
+                                            @Nullable Object @Nullable [] singleSelectedPathUserObjects) {
+    sink.lazy(CommonDataKeys.PSI_ELEMENT, () -> {
       final PsiElement[] elements = getPsiElements(selectedUserObjects);
       return elements.length == 1 ? elements[0] : null;
-    }
-    if (PlatformCoreDataKeys.PSI_ELEMENT_ARRAY.is(dataId)) {
+    });
+    sink.lazy(PlatformCoreDataKeys.PSI_ELEMENT_ARRAY, () -> {
       PsiElement[] elements = getPsiElements(selectedUserObjects);
       return elements.length > 0 ? elements : null;
-    }
-    if (PlatformCoreDataKeys.PROJECT_CONTEXT.is(dataId)) {
+    });
+    sink.lazy(PlatformCoreDataKeys.PROJECT_CONTEXT, () -> {
       Object selected = getSingleNodeElement(selectedUserObjects);
-      return selected instanceof Project ? selected : null;
-    }
-    if (LangDataKeys.MODULE_CONTEXT.is(dataId)) {
+      return selected instanceof Project o ? o : null;
+    });
+    sink.lazy(LangDataKeys.MODULE_CONTEXT, () -> {
       Object selected = getSingleNodeElement(selectedUserObjects);
       return moduleContext(myProject, selected);
-    }
-    if (LangDataKeys.MODULE_CONTEXT_ARRAY.is(dataId)) {
+    });
+    sink.lazy(LangDataKeys.MODULE_CONTEXT_ARRAY, () -> {
       return getSelectedModules(selectedUserObjects);
-    }
-    if (ProjectView.UNLOADED_MODULES_CONTEXT_KEY.is(dataId)) {
+    });
+    sink.lazy(ProjectView.UNLOADED_MODULES_CONTEXT_KEY, () -> {
       return Collections.unmodifiableList(getSelectedUnloadedModules(selectedUserObjects));
-    }
-    if (PlatformDataKeys.DELETE_ELEMENT_PROVIDER.is(dataId)) {
+    });
+    sink.lazy(PlatformDataKeys.DELETE_ELEMENT_PROVIDER, () -> {
       Module[] modules = getSelectedModules(selectedUserObjects);
       if (modules != null || !getSelectedUnloadedModules(selectedUserObjects).isEmpty()) {
         return ModuleDeleteProvider.getInstance();
@@ -433,20 +429,19 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
         return new DetachLibraryDeleteProvider(myProject, orderEntry);
       }
       return myDeletePSIElementProvider;
-    }
-    if (ModuleGroup.ARRAY_DATA_KEY.is(dataId)) {
+    });
+    sink.lazy(ModuleGroup.ARRAY_DATA_KEY, () -> {
       final List<ModuleGroup> selectedElements = getSelectedValues(selectedUserObjects, ModuleGroup.class);
       return selectedElements.isEmpty() ? null : selectedElements.toArray(new ModuleGroup[0]);
-    }
-    if (LibraryGroupElement.ARRAY_DATA_KEY.is(dataId)) {
+    });
+    sink.lazy(LibraryGroupElement.ARRAY_DATA_KEY, () -> {
       final List<LibraryGroupElement> selectedElements = getSelectedValues(selectedUserObjects, LibraryGroupElement.class);
       return selectedElements.isEmpty() ? null : selectedElements.toArray(new LibraryGroupElement[0]);
-    }
-    if (NamedLibraryElement.ARRAY_DATA_KEY.is(dataId)) {
+    });
+    sink.lazy(NamedLibraryElement.ARRAY_DATA_KEY, () -> {
       final List<NamedLibraryElement> selectedElements = getSelectedValues(selectedUserObjects, NamedLibraryElement.class);
       return selectedElements.isEmpty() ? null : selectedElements.toArray(new NamedLibraryElement[0]);
-    }
-    return null;
+    });
   }
 
   @RequiresReadLock(generateAssertion = false)
@@ -619,6 +614,7 @@ public abstract class AbstractProjectViewPane implements UiCompatibleDataProvide
       var initListener = new MyTreeStateListener();
       myTree.addTreeExpansionListener(initListener);
       treeState.applyTo(myTree);
+      myNonEmptyTreeStateRestored = true;
     }
     else if (myTree.isSelectionEmpty()) {
       TreeUtil.promiseSelectFirst(myTree);

@@ -7,96 +7,47 @@ package com.intellij.concurrency.client
 import com.intellij.util.Processor
 import org.jetbrains.annotations.ApiStatus
 import java.util.concurrent.Callable
+import java.util.concurrent.atomic.AtomicReference
 import java.util.function.BiConsumer
 import java.util.function.Function
 
-private val threadLocalClientIdString = ThreadLocal.withInitial<String?> { null }
-@get:ApiStatus.Internal
-@set:ApiStatus.Internal
-var currentClientIdString: String?
-  get() = threadLocalClientIdString.get()
-  set(value) = threadLocalClientIdString.set(value)
-
-@get:ApiStatus.Internal
-@set:ApiStatus.Internal
-var propagateClientIdAcrossThreads: Boolean = false
-
-private inline fun <T> withClientId(clientId: String?, action: () -> T): T {
-  val oldClientIdValue = currentClientIdString
-  try {
-    currentClientIdString = clientId
-    return action()
-  }
-  finally {
-    currentClientIdString = oldClientIdValue
-  }
-}
-
-internal fun withClientId(clientId: String?, action: Runnable) = withClientId(clientId, action::run)
-internal fun <T> withClientId(clientId: String?, callable: Callable<T>) = withClientId(clientId, callable::call)
-
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun captureClientIdInRunnable(runnable: Runnable): Runnable {
-  if (!propagateClientIdAcrossThreads) return runnable
-  val currentId = currentClientIdString
-  return Runnable {
-    withClientId(currentId) {
-      runnable.run()
-    }
-  }
-}
+val captureClientIdInRunnableFun = AtomicReference<((Runnable) -> Runnable)>({ runnable -> runnable })
 
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun <T> captureClientIdInCallable(callable: Callable<T>): Callable<T> {
-  if (!propagateClientIdAcrossThreads) return callable
-  val currentId = currentClientIdString
-  return Callable {
-    withClientId(currentId) {
-      callable.call()
-    }
-  }
-}
+val captureClientIdInCallableFun = AtomicReference<((Callable<*>) -> Callable<*>)>({ callable -> callable })
 
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun <T> captureClientIdInProcessor(processor: Processor<T>): Processor<T> {
-  if (!propagateClientIdAcrossThreads) return processor
-  val currentId = currentClientIdString
-  return Processor {
-    withClientId(currentId) {
-      processor.process(it)
-    }
-  }
-}
+val captureClientIdInFunctionFun = AtomicReference<((Function<*, *>) -> Function<*, *>)>({ function -> function })
 
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun <T> captureClientId(action: () -> T): () -> T {
-  if (propagateClientIdAcrossThreads) return action
-  val currentId = currentClientIdString
-  return {
-    withClientId(currentId) {
-      action()
-    }
-  }
-}
+val captureClientIdInBiConsumerFun = AtomicReference<((BiConsumer<*, *>) -> BiConsumer<*, *>)>({ biConsumer -> biConsumer })
 
+// TODO: cleanup code on the call site and remove this file
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun <T, R> captureClientIdInFunction(function: Function<T, R>): Function<T, R> {
-  if (!propagateClientIdAcrossThreads) return function
-  val currentId = currentClientIdString
-  return Function {
-    withClientId(currentId) {
-      function.apply(it)
-    }
-  }
-}
+fun captureClientIdInRunnable(runnable: Runnable): Runnable = captureClientIdInRunnableFun.get()(runnable)
 
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
 @ApiStatus.Internal
-fun <T, U> captureClientIdInBiConsumer(biConsumer: BiConsumer<T, U>): BiConsumer<T, U> {
-  if (!propagateClientIdAcrossThreads) return biConsumer
-  val currentId = currentClientIdString
-  return BiConsumer { t, u ->
-    withClientId(currentId) {
-      biConsumer.accept(t, u)
-    }
-  }
-}
+fun <T> captureClientIdInCallable(callable: Callable<T>): Callable<T> = captureClientIdInCallableFun.get()(callable) as Callable<T>
+
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
+@ApiStatus.Internal
+fun <T> captureClientIdInProcessor(processor: Processor<T>): Processor<T> = processor
+
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
+@ApiStatus.Internal
+fun <T> captureClientId(action: () -> T): () -> T = action
+
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
+@ApiStatus.Internal
+fun <T, R> captureClientIdInFunction(function: Function<T, R>): Function<T, R> = captureClientIdInFunctionFun.get()(function) as Function<T, R>
+
+@Deprecated("ClientId propagation is handled by context propagation. You don't need to do it manually. The method will be removed soon.")
+@ApiStatus.Internal
+fun <T, U> captureClientIdInBiConsumer(biConsumer: BiConsumer<T, U>): BiConsumer<T, U> = captureClientIdInBiConsumerFun.get()(biConsumer) as BiConsumer<T, U>

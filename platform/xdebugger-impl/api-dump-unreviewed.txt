@@ -39,12 +39,26 @@ com.intellij.xdebugger.attach.XAttachDebuggerProvider
 - a:isAttachHostApplicable(com.intellij.xdebugger.attach.XAttachHost):Z
 com.intellij.xdebugger.attach.XAttachHost
 - a:getProcessList():java.util.List
+- getProcessListAsync(kotlin.coroutines.Continuation):java.lang.Object
+- bs:getProcessListAsync$suspendImpl(com.intellij.xdebugger.attach.XAttachHost,kotlin.coroutines.Continuation):java.lang.Object
+com.intellij.xdebugger.attach.XAttachHost$Async
+- com.intellij.xdebugger.attach.XAttachHost
+- getProcessList():java.util.List
+- a:getProcessListAsync(kotlin.coroutines.Continuation):java.lang.Object
 com.intellij.xdebugger.attach.XAttachHostPresentationGroup
 - com.intellij.xdebugger.attach.XAttachPresentationGroup
 com.intellij.xdebugger.attach.XAttachHostProvider
+- sf:Companion:com.intellij.xdebugger.attach.XAttachHostProvider$Companion
 - sf:EP:com.intellij.openapi.extensions.ExtensionPointName
 - a:getAvailableHosts(com.intellij.openapi.project.Project):java.util.List
+- getAvailableHostsAsync(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
+- bs:getAvailableHostsAsync$suspendImpl(com.intellij.xdebugger.attach.XAttachHostProvider,com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
 - a:getPresentationGroup():com.intellij.xdebugger.attach.XAttachPresentationGroup
+com.intellij.xdebugger.attach.XAttachHostProvider$Async
+- com.intellij.xdebugger.attach.XAttachHostProvider
+- getAvailableHosts(com.intellij.openapi.project.Project):java.util.List
+- a:getAvailableHostsAsync(com.intellij.openapi.project.Project,kotlin.coroutines.Continuation):java.lang.Object
+f:com.intellij.xdebugger.attach.XAttachHostProvider$Companion
 com.intellij.xdebugger.attach.XAttachPresentationGroup
 - java.util.Comparator
 - a:getGroupName():java.lang.String
@@ -1610,6 +1624,7 @@ f:com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl
 - s:getSettingsEP():com.intellij.openapi.extensions.ExtensionPointName
 - getState():com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl$SettingsState
 - loadState(com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl$SettingsState):V
+- noStateLoaded():V
 c:com.intellij.xdebugger.impl.settings.XDebuggerSettingManagerImpl$SettingsState
 - specificStates:java.util.List
 - <init>():V
@@ -1679,8 +1694,8 @@ a:com.intellij.xdebugger.impl.ui.DebuggerSessionTabBase
 f:com.intellij.xdebugger.impl.ui.DebuggerUIUtil
 - sf:FULL_VALUE_POPUP_DIMENSION_KEY:java.lang.String
 - s:addToWatches(com.intellij.xdebugger.impl.frame.XWatchesView,com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl):V
+- *s:createFormattedTextViewer(java.lang.String,com.intellij.openapi.fileTypes.FileType,com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):com.intellij.openapi.editor.Editor
 - *s:createTextViewer(java.lang.String,com.intellij.openapi.project.Project):com.intellij.xdebugger.impl.ui.TextViewer
-- *s:createTextViewer(java.lang.String,com.intellij.openapi.project.Project,com.intellij.openapi.fileTypes.FileType):com.intellij.xdebugger.impl.ui.TextViewer
 - *s:createTextViewerPopupBuilder(javax.swing.JComponent,com.intellij.xdebugger.impl.ui.TextViewer,com.intellij.xdebugger.frame.XFullValueEvaluator,com.intellij.openapi.project.Project,java.lang.Runnable,java.lang.Runnable):com.intellij.openapi.ui.popup.ComponentPopupBuilder
 - s:createValuePopup(com.intellij.openapi.project.Project,javax.swing.JComponent,java.lang.Runnable):com.intellij.openapi.ui.popup.JBPopup
 - s:enableEditorOnCheck(javax.swing.JCheckBox,javax.swing.JComponent):V
@@ -2789,8 +2804,9 @@ c:com.intellij.xdebugger.impl.ui.tree.nodes.XValueTextRendererImpl
 *a:com.intellij.xdebugger.impl.ui.visualizedtext.TextBasedContentTab
 - com.intellij.xdebugger.ui.VisualizedContentTab
 - <init>():V
-- createComponent(com.intellij.openapi.project.Project):javax.swing.JComponent
-- pa:formatText():java.lang.String
+- f:createComponent(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):javax.swing.JComponent
+- pf:createEditor(com.intellij.openapi.project.Project,com.intellij.openapi.Disposable):com.intellij.openapi.editor.Editor
+- a:formatText():java.lang.String
 - pa:getFileType():com.intellij.openapi.fileTypes.FileType
 c:com.intellij.xdebugger.memory.action.ShowClassesWithDiffAction
 - com.intellij.openapi.actionSystem.ToggleAction

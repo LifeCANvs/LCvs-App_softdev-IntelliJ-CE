@@ -6,18 +6,19 @@ import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.pom.java.LanguageLevel;
 import com.intellij.psi.*;
 import com.intellij.psi.codeStyle.JavaFileCodeStyleFacade;
 import com.intellij.psi.impl.source.javadoc.PsiDocMethodOrFieldRef;
 import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.javadoc.PsiDocTagValue;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.util.MethodSignature;
-import com.intellij.psi.util.MethodSignatureUtil;
-import com.intellij.psi.util.PsiUtil;
-import com.intellij.psi.util.TypeConversionUtil;
+import com.intellij.psi.templateLanguages.TemplateLanguageUtil;
+import com.intellij.psi.util.*;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.IncorrectOperationException;
+import com.intellij.util.ObjectUtils;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -420,5 +421,40 @@ public final class JavaDocUtil {
 
   public static boolean isInsidePackageInfo(@Nullable PsiDocComment containingComment) {
     return containingComment != null && containingComment.getOwner() == null && containingComment.getParent() instanceof PsiJavaFile;
+  }
+
+  public static boolean isDanglingDocComment(@NotNull PsiDocComment comment, boolean ignoreCopyright) {
+    if (comment.getOwner() != null || TemplateLanguageUtil.isInsideTemplateFile(comment)) {
+      return false;
+    }
+    if (isInsidePackageInfo(comment) &&
+        PsiTreeUtil.skipWhitespacesAndCommentsForward(comment) instanceof PsiPackageStatement &&
+        "package-info.java".equals(comment.getContainingFile().getName())) {
+      return false;
+    }
+    if (ignoreCopyright && comment.getPrevSibling() == null && comment.getParent() instanceof PsiFile) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * @return Whether the inspections should be run for the given comment
+   * Markdown format is allowed for java < 23. However, due to old (sometimes generated) code starting with 3 slashes,
+   * we should not run the inspections on dangling comments.
+   */
+  @Contract("null -> false")
+  public static boolean shouldRunInspectionOnOldMarkdownComment(@Nullable PsiDocComment comment) {
+    if (comment == null) return false;
+    if (!comment.isMarkdownComment()) return true;
+    PsiJavaFile file = ObjectUtils.tryCast(comment.getContainingFile(), PsiJavaFile.class);
+    if (file == null) return false;
+
+    if (file.getLanguageLevel().isAtLeast(LanguageLevel.JDK_23)) return true;
+    return !isDanglingDocComment(comment, true);
+  }
+
+  public static boolean shouldRunInspectionOnOldMarkdownComment(@NotNull PsiElement element) {
+    return shouldRunInspectionOnOldMarkdownComment(PsiTreeUtil.getParentOfType(element, PsiDocComment.class, false, PsiMember.class));
   }
 }

@@ -635,7 +635,9 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
         JTree tree = pane.getTree();
         if (tree != null && projectView instanceof ProjectViewImpl impl && impl.firstShow) {
           impl.firstShow = false;
-          TreeUtil.promiseSelectFirst(tree).onSuccess(tree::expandPath);
+          if (!pane.myNonEmptyTreeStateRestored) {
+            TreeUtil.promiseSelectFirst(tree).onSuccess(tree::expandPath);
+          }
         }
       }
 
@@ -689,22 +691,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     List<AnAction> result = new ArrayList<>();
     result.add(views);
     result.add(Separator.getInstance());
-
-    if (actionGroup != null) {
-      List<AnAction> secondary = new ArrayList<>();
-      for (AnAction each : actionGroup.getChildren(ActionManager.getInstance())) {
-        if (actionGroup.isPrimary(each)) {
-          result.add(each);
-        }
-        else {
-          secondary.add(each);
-        }
-      }
-
-      result.add(Separator.getInstance());
-      result.addAll(secondary);
-    }
-
+    result.add(actionGroup);
     return result;
   }
 
@@ -1860,7 +1847,15 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   }
 
   void selectOpenedFileUsingLastFocusedEditor() {
-    selectOpenedFile(getLastFocusedEditor());
+    // invokeLater is needed here to give FileEditorManagerImpl time to figure out which editor is the last focused one.
+    // If the IDE frame has just became active because the Select Opened File button was clicked,
+    // then the editor may temporarily get focus before the Project View is focused.
+    // This needs to be undone before we can select the right file.
+    // And no, there's no way to prevent that temporary focus.
+    // See com.intellij.openapi.fileEditor.impl.EditorsSplitters.MyFocusWatcher for the gore details.
+    SwingUtilities.invokeLater(() -> {
+      selectOpenedFile(getLastFocusedEditor());
+    });
   }
 
   void selectOpenedFile() {
@@ -2101,7 +2096,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
         super.update(e);
         var presentation = e.getPresentation();
         presentation.setEnabledAndVisible(ApplicationManager.getApplication().isUnitTestMode());
-        if (ActionPlaces.isPopupPlace(e.getPlace())) {
+        if (e.isFromContextMenu()) {
           presentation.setIcon(null);
         }
         var pane = getCurrentProjectViewPane(e);

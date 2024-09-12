@@ -1021,6 +1021,16 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
                 runTest("../testData/basic/common/extensions/JavaTypeExtension.kt");
             }
 
+            @TestMetadata("KTIJ-28743.kt")
+            public void testKTIJ_28743() throws Exception {
+                runTest("../testData/basic/common/extensions/KTIJ-28743.kt");
+            }
+
+            @TestMetadata("KTIJ-30225.kt")
+            public void testKTIJ_30225() throws Exception {
+                runTest("../testData/basic/common/extensions/KTIJ-30225.kt");
+            }
+
             @TestMetadata("KotlinGenericTypeExtension.kt")
             public void testKotlinGenericTypeExtension() throws Exception {
                 runTest("../testData/basic/common/extensions/KotlinGenericTypeExtension.kt");
@@ -4307,6 +4317,11 @@ public abstract class K1MLPerformanceCompletionTestGenerated extends AbstractK1M
             @TestMetadata("SAMAdaptersStatic.kt")
             public void testSAMAdaptersStatic() throws Exception {
                 runTest("../testData/basic/java/SAMAdaptersStatic.kt");
+            }
+
+            @TestMetadata("SamAdapters.kt")
+            public void testSamAdapters() throws Exception {
+                runTest("../testData/basic/java/SamAdapters.kt");
             }
 
             @TestMetadata("StandardKotlinTypeAliasAfterExplicitlyImported.kt")

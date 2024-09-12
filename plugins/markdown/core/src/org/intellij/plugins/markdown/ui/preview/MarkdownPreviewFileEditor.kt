@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -36,7 +37,6 @@ import kotlinx.coroutines.launch
 import org.intellij.plugins.markdown.MarkdownBundle
 import org.intellij.plugins.markdown.settings.MarkdownExtensionsSettings
 import org.intellij.plugins.markdown.settings.MarkdownSettings
-import org.intellij.plugins.markdown.ui.preview.html.MarkdownUtil.generateMarkdownHtml
 import org.intellij.plugins.markdown.ui.preview.jcef.MarkdownJCEFHtmlPanel
 import org.intellij.plugins.markdown.util.MarkdownPluginScope
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -203,13 +203,17 @@ class MarkdownPreviewFileEditor(
       return
     }
 
-    val html = readAction { generateMarkdownHtml(file, document.text, project) }
+    val settings = MarkdownSettings.getInstance(project)
+    val textPreprocessor = retrievePanelProvider(settings).sourceTextPreprocessor
+    lastRenderedHtml = readAction {
+      textPreprocessor.preprocessText(project, document, file)
+    }
 
-    val currentHtml = "<html><head></head>$html</html>"
-    lastRenderedHtml = currentHtml
     val editor = mainEditor.firstOrNull() ?: return
-    val offset = editor.caretModel.offset
-    panel.setHtml(lastRenderedHtml, offset, file)
+    writeIntentReadAction {
+      val offset = editor.caretModel.offset
+      panel.setHtml(lastRenderedHtml, offset, file)
+    }
   }
 
   @RequiresEdt
@@ -226,7 +230,8 @@ class MarkdownPreviewFileEditor(
   @RequiresEdt
   private suspend fun attachHtmlPanel() {
     val settings = MarkdownSettings.getInstance(project)
-    val panel = retrievePanelProvider(settings).createHtmlPanel(project, file)
+    val panelProvider = retrievePanelProvider(settings)
+    val panel = panelProvider.createHtmlPanel(project, file)
     this.panel = panel
     htmlPanelWrapper.add(panel.component, BorderLayout.CENTER)
     if (htmlPanelWrapper.isShowing) htmlPanelWrapper.validate()

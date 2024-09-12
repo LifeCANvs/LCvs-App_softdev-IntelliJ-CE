@@ -4,7 +4,7 @@ package org.jetbrains.jps.incremental.fs;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.SmartList;
-import com.intellij.util.containers.FastUtilHashingStrategies;
+import com.intellij.util.containers.FileHashStrategy;
 import com.intellij.util.containers.MultiMap;
 import com.intellij.util.io.IOUtil;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
@@ -22,6 +22,7 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
@@ -39,7 +40,7 @@ public final class BuildFSState {
   private final boolean myAlwaysScanFS;
   private final Set<BuildTarget<?>> myInitialScanPerformed = Collections.synchronizedSet(new HashSet<>());
   @SuppressWarnings("SSBasedInspection")
-  private final Object2LongOpenCustomHashMap<File> myRegistrationStamps = new Object2LongOpenCustomHashMap<>(FastUtilHashingStrategies.FILE_HASH_STRATEGY);
+  private final Object2LongOpenCustomHashMap<File> myRegistrationStamps = new Object2LongOpenCustomHashMap<>(FileHashStrategy.INSTANCE);
   private final Map<BuildTarget<?>, FilesDelta> myDeltas = Collections.synchronizedMap(new HashMap<>());
 
   public BuildFSState(boolean alwaysScanFS) {
@@ -169,7 +170,7 @@ public final class BuildFSState {
                               @Nullable StampsStorage<? extends StampsStorage.Stamp> stampStorage) throws IOException {
     registerDeleted(context, target, file);
     if (stampStorage != null) {
-      stampStorage.removeStamp(file, target);
+      stampStorage.removeStamp(file.toPath(), target);
     }
   }
 
@@ -274,7 +275,7 @@ public final class BuildFSState {
           }
         }
         if (stampStorage != null) {
-          stampStorage.removeStamp(file, rd.getTarget());
+          stampStorage.removeStamp(file.toPath(), rd.getTarget());
         }
       }
       else {
@@ -304,7 +305,7 @@ public final class BuildFSState {
                                        @Nullable StampsStorage<? extends StampsStorage.Stamp> stampStorage) throws IOException {
     final boolean marked = getDelta(rd.getTarget()).markRecompileIfNotDeleted(rd, file);
     if (marked && stampStorage != null) {
-      stampStorage.removeStamp(file, rd.getTarget());
+      stampStorage.removeStamp(file.toPath(), rd.getTarget());
     }
     if (marked) {
       final FilesDelta roundDelta = getRoundDelta(round == CompilationRound.NEXT? NEXT_ROUND_DELTA_KEY : CURRENT_ROUND_DELTA_KEY, context);
@@ -399,14 +400,15 @@ public final class BuildFSState {
         CompileScope scope = context.getScope();
         for (File file : files) {
           if (scope.isAffected(target, file)) {
-            final long currentFileTimestamp = FSOperations.lastModified(file);
-            StampsStorage.Stamp stamp = stampsStorage.getCurrentStamp(file);
+            Path nioFile = file.toPath();
+            long currentFileTimestamp = FSOperations.lastModified(nioFile);
+            StampsStorage.Stamp stamp = stampsStorage.getCurrentStamp(nioFile);
             if (!rd.isGenerated() && (currentFileTimestamp > targetBuildStartStamp || getEventRegistrationStamp(file) > targetBuildStartStamp)) {
               // if the file was modified after the compilation had started,
               // do not save the stamp considering file dirty
               // Important!
               // Event registration stamp check is essential for the files that were actually changed _before_ targetBuildStart,
-              // but corresponding change event was received and processed _after_ targetBuildStart
+              // but the corresponding change event was received and processed _after_ targetBuildStart
               if (Utils.IS_TEST_MODE) {
                 LOG.info("Timestamp after compilation started; marking dirty again: " + file.getPath());
               }
@@ -414,7 +416,7 @@ public final class BuildFSState {
             }
             else {
               marked = true;
-              stampsStorage.saveStamp(file, target, stamp); // todo: ask jeka
+              stampsStorage.saveStamp(nioFile, target, stamp); // todo: ask jeka
             }
           }
           else {
@@ -447,5 +449,4 @@ public final class BuildFSState {
       key.set(context, delta);
     }
   }
-
 }

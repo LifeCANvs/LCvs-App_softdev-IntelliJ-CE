@@ -32,12 +32,16 @@ public final class ThreadingAssertions {
   @VisibleForTesting
   public static final String MUST_EXECUTE_IN_READ_ACTION =
     "Read access is allowed from inside read-action only (see Application.runReadAction())";
+  private static final String MUST_EXECUTE_IN_READ_ACTION_EXPLICIT =
+    "Read access is allowed from inside explicit read-action only (see Application.runReadAction()). Now implicit WriteIntentReadAction.run() is used.";
   @Internal
   @VisibleForTesting
   public static final String MUST_NOT_EXECUTE_IN_READ_ACTION =
     "Must not execute inside read action";
   private static final String MUST_EXECUTE_IN_WRITE_INTENT_READ_ACTION =
     "Access is allowed from write thread only";
+  private static final String MUST_EXECUTE_IN_WRITE_INTENT_READ_ACTION_EXPLICIT =
+    "Access is allowed from write thread only with explicit WriteIntentReadAction.run(). Now implicit WriteIntentReadAction.run() is used.";
   @Internal
   @VisibleForTesting
   public static final String MUST_EXECUTE_IN_WRITE_ACTION =
@@ -52,6 +56,8 @@ public final class ThreadingAssertions {
     "Access from Event Dispatch Thread (EDT) is not allowed";
 
   private static final String DOCUMENTATION_URL = "https://jb.gg/ij-platform-threading";
+
+  private static boolean implicitLock = false;
 
   /**
    * Asserts that the current thread is the event dispatch thread.
@@ -111,6 +117,17 @@ public final class ThreadingAssertions {
     if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
       throwThreadAccessException(MUST_EXECUTE_IN_READ_ACTION);
     }
+    else if (isImplicitLockOnEDT()) {
+      reportImplicitRead();
+    }
+  }
+
+  /**
+   * Reports message about implicit read to logger at error level
+   */
+  @Internal
+  public static void reportImplicitRead() {
+    getLogger().error(createThreadAccessException(MUST_EXECUTE_IN_READ_ACTION_EXPLICIT));
   }
 
   /**
@@ -148,6 +165,17 @@ public final class ThreadingAssertions {
     if (!ApplicationManager.getApplication().isWriteIntentLockAcquired()) {
       throwWriteIntentReadAccess();
     }
+    else if (isImplicitLockOnEDT()) {
+      reportImplicitWriteIntent();
+    }
+  }
+
+  /**
+   * Reports message about implicit read to logger at error level
+   */
+  @Internal
+  public static void reportImplicitWriteIntent() {
+    getLogger().error(createThreadAccessException(MUST_EXECUTE_IN_WRITE_INTENT_READ_ACTION_EXPLICIT));
   }
 
   /**
@@ -174,7 +202,7 @@ public final class ThreadingAssertions {
 
   private static @NotNull RuntimeExceptionWithAttachments createThreadAccessException(@NonNls @NotNull String message) {
     return new RuntimeExceptionWithAttachments(
-      message + "; see " + DOCUMENTATION_URL + " for details" + "\n" + getThreadDetails()
+      message + "; If you access or modify model on EDT consider wrapping your code in WriteIntentReadAction or ReadAction; see " + DOCUMENTATION_URL + " for details" + "\n" + getThreadDetails()
     );
   }
 
@@ -187,5 +215,17 @@ public final class ThreadingAssertions {
 
   private static @NotNull String describe(@Nullable Thread o) {
     return o == null ? "null" : o + " " + System.identityHashCode(o);
+  }
+
+  public static boolean isImplicitLockOnEDT() {
+    if (!EDT.isCurrentThreadEdt())
+      return false;
+    return implicitLock;
+  }
+
+  public static void setImplicitLockOnEDT(boolean implicitLock) {
+    if (!EDT.isCurrentThreadEdt())
+      return;
+    ThreadingAssertions.implicitLock = implicitLock;
   }
 }

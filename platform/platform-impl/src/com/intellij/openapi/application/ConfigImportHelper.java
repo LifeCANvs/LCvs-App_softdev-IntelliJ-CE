@@ -6,13 +6,13 @@ import com.intellij.diagnostic.VMOptions;
 import com.intellij.ide.BootstrapBundle;
 import com.intellij.ide.GeneralSettings;
 import com.intellij.ide.actions.ImportSettingsFilenameFilter;
-import com.intellij.ide.cloudConfig.CloudConfigProvider;
 import com.intellij.ide.highlighter.ArchiveFileType;
 import com.intellij.ide.plugins.*;
 import com.intellij.ide.plugins.marketplace.MarketplacePluginDownloadService;
 import com.intellij.ide.startup.StartupActionScriptManager;
 import com.intellij.ide.startup.StartupActionScriptManager.ActionCommand;
 import com.intellij.ide.ui.laf.LookAndFeelThemeAdapterKt;
+import com.intellij.idea.AppMode;
 import com.intellij.openapi.application.migrations.AIAssistant241;
 import com.intellij.openapi.application.migrations.JpaBuddyMigration242;
 import com.intellij.openapi.application.migrations.NotebooksMigration242;
@@ -187,16 +187,7 @@ public final class ConfigImportHelper {
           importScenarioStatistics = SHOW_DIALOG_REQUESTED_BY_PROPERTY;
         }
         else if (guessedOldConfigDirs.isEmpty()) {
-          boolean importedFromCloud = false;
-          CloudConfigProvider configProvider = CloudConfigProvider.getProvider();
-          if (configProvider != null) {
-            importedFromCloud = configProvider.importSettingsSilently(newConfigDir);
-
-            if (importedFromCloud) {
-              importScenarioStatistics = IMPORTED_FROM_CLOUD;
-            }
-          }
-          if (!importedFromCloud && !veryFirstStartOnThisComputer) {
+          if (!veryFirstStartOnThisComputer) {
             oldConfigDirAndOldIdePath = showDialogAndGetOldConfigPath(guessedOldConfigDirs.getPaths());
             importScenarioStatistics = SHOW_DIALOG_NO_CONFIGS_FOUND;
           }
@@ -225,6 +216,11 @@ public final class ConfigImportHelper {
         var configImportOptions = new ConfigImportOptions(log);
         configImportOptions.importSettings = settings;
         configImportOptions.mergeVmOptions = customMigrationOption instanceof CustomConfigMigrationOption.MergeConfigs;
+        
+        /* in remote dev host mode UI cannot be shown before `Application` is initialized because it replaces the standard `awt.toolkit` 
+           with com.intellij.platform.impl.toolkit.IdeToolkit which depends on `Application` */
+        configImportOptions.setHeadless(AppMode.isRemoteDevHost());
+        
         if (!guessedOldConfigDirs.fromSameProduct) {
           importScenarioStatistics = IMPORTED_FROM_OTHER_PRODUCT;
         }
@@ -280,10 +276,19 @@ public final class ConfigImportHelper {
     // TODO remove hack, should we support vmoptions import in per project?
     // TODO If so, we need to patch restarter.
     if (vmOptionFileChanged && !ProjectManagerEx.IS_PER_PROJECT_INSTANCE_ENABLED) {
-      log.info("The vmoptions file has changed, restarting...");
-      if (settings == null || settings.shouldRestartAfterVmOptionsChange()) {
-        writeOptionsForRestart(newConfigDir, log);
-        restart(args);
+      if (!AppMode.isRemoteDevHost()) {
+        if (settings == null || settings.shouldRestartAfterVmOptionsChange()) {
+          log.info("The vmoptions file has changed, restarting...");
+          writeOptionsForRestart(newConfigDir, log);
+          restart(args);
+        }
+        else {
+          log.info("The vmoptions file has changed, but restart is switched off by " + settings);
+        }
+      }
+      else {
+        //todo restore restarting for the backend process after GTW-9531 is fixed
+        log.warn("The vmoptions file has changed, but the backend process wasn't restarted; custom vmoptions will be used on the next run only");
       }
     }
   }
@@ -1178,7 +1183,7 @@ public final class ConfigImportHelper {
     if (options.headless) {
       PluginDownloader.runSynchronouslyInBackground(() -> {
         ProgressIndicator progressIndicator =
-          options.headlessProgressIndicator == null ? new EmptyProgressIndicator() : options.headlessProgressIndicator;
+          options.headlessProgressIndicator == null ? new EmptyProgressIndicator(ModalityState.nonModal()) : options.headlessProgressIndicator;
         downloadUpdatesForIncompatiblePlugins(newPluginsDir, options, incompatiblePlugins, progressIndicator);
       });
     }

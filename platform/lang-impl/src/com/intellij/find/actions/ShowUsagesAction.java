@@ -130,6 +130,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
   @ApiStatus.Internal
   public static final String CLOSE_REASON_RESET_FILTERS = "ResetFilters";
 
+  private static final String DIMENSION_SERVICE_KEY = "ShowUsagesActions.dimensionServiceKey";
   private static final String SPLITTER_SERVICE_KEY = "ShowUsagesActions.splitterServiceKey";
   private static final String PREVIEW_PROPERTY_KEY = "ShowUsagesActions.previewPropertyKey";
 
@@ -178,7 +179,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
 
   @Override
   public void update(@NotNull AnActionEvent e) {
-    FindUsagesInFileAction.updateFindUsagesAction(e);
+    FindUsagesAction.updateFindUsagesAction(e);
 
     if (e.getPresentation().isEnabled()) {
       UsageTarget[] usageTargets = e.getData(UsageView.USAGE_TARGETS_KEY);
@@ -764,10 +765,9 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
   }
 
   private static @NotNull AnActionEvent fakeEvent(@NotNull ToggleAction action) {
-    return new AnActionEvent(
-      null, DataContext.EMPTY_CONTEXT, "",
-      action.getTemplatePresentation().clone(), ActionManager.getInstance(), 0
-    );
+    return AnActionEvent.createEvent(
+      DataContext.EMPTY_CONTEXT,
+      action.getTemplatePresentation().clone(), ActionPlaces.UNKNOWN, ActionUiKind.NONE, null);
   }
 
   private static @NotNull Predicate<? super Usage> originUsageCheck(@Nullable Editor editor) {
@@ -922,7 +922,8 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
       setAdvertiser(advertiserComponent).
       setMovable(true).
       setResizable(true).
-      setCancelKeyEnabled(true);
+      setCancelKeyEnabled(true).
+      setDimensionServiceKey(DIMENSION_SERVICE_KEY);
 
     PropertiesComponent properties = PropertiesComponent.getInstance(project);
     boolean addCodePreview = properties.isValueSet(PREVIEW_PROPERTY_KEY);
@@ -978,6 +979,7 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
           properties.setValue(PREVIEW_PROPERTY_KEY, state);
           cancel(popupRef.get(), actionHandler, CLOSE_REASON_PREVIEW);
 
+          WindowStateService.getInstance().putSize(DIMENSION_SERVICE_KEY, null);
           showElementUsages(parameters, actionHandler);
         }
       }
@@ -1431,10 +1433,21 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
     table.setSize(rectangle.width, rectangle.height - minHeight);
     if (dataSize > 0) ScrollingUtil.ensureSelectionExists(table);
 
+    Dimension savedSize = WindowStateService.getInstance().getSize(DIMENSION_SERVICE_KEY);
     JBSplitter splitter = popup.getUserData(JBSplitter.class);
 
+    if (savedSize != null) {
+      rectangle.width = Math.min(savedSize.width, rectangle.width);
+    }
+
     if (splitter != null) {
-      rectangle.height += splitter.getDividerWidth() + splitter.getSecondComponent().getMinimumSize().height;
+      int newHeight = rectangle.height + splitter.getDividerWidth() + splitter.getSecondComponent().getMinimumSize().height;
+      if (savedSize != null) {
+        savedSize.height -= popup.getAdComponentHeight();
+        newHeight = Math.max(newHeight, savedSize.height);
+      }
+
+      rectangle.height = newHeight;
     }
 
     popup.setSize(rectangle.getSize());

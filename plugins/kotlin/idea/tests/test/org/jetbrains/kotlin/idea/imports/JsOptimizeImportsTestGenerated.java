@@ -311,6 +311,11 @@ public abstract class JsOptimizeImportsTestGenerated extends AbstractJsOptimizeI
                 runTest("testData/editor/optimizeImports/common/DefaultObjectReference.kt");
             }
 
+            @TestMetadata("EnumEntryUsedInsideEnum.kt")
+            public void testEnumEntryUsedInsideEnum() throws Exception {
+                runTest("testData/editor/optimizeImports/common/EnumEntryUsedInsideEnum.kt");
+            }
+
             @TestMetadata("Enums.kt")
             public void testEnums() throws Exception {
                 runTest("testData/editor/optimizeImports/common/Enums.kt");
@@ -394,6 +399,11 @@ public abstract class JsOptimizeImportsTestGenerated extends AbstractJsOptimizeI
             @TestMetadata("InnerClassConstructor_superType.kt")
             public void testInnerClassConstructor_superType() throws Exception {
                 runTest("testData/editor/optimizeImports/common/InnerClassConstructor_superType.kt");
+            }
+
+            @TestMetadata("IntUnaryOperatorsAreNotUnresolvedOnLiterals.kt")
+            public void testIntUnaryOperatorsAreNotUnresolvedOnLiterals() throws Exception {
+                runTest("testData/editor/optimizeImports/common/IntUnaryOperatorsAreNotUnresolvedOnLiterals.kt");
             }
 
             @TestMetadata("InvokeFunction.kt")

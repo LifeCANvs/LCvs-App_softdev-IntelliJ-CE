@@ -133,14 +133,6 @@ interface CellBuilder<out T : JComponent> {
   @Deprecated("Use Kotlin UI DSL Version 2")
   fun onIsModified(callback: () -> Boolean): CellBuilder<T>
 
-  /**
-   * All components of the same group share will get the same BoundSize (min/preferred/max),
-   * which is that of the biggest component in the group
-   */
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2, see Cell.widthGroup()", level = DeprecationLevel.HIDDEN)
-  fun sizeGroup(name: String): CellBuilder<T>
-
   @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2")
   fun growPolicy(growPolicy: GrowPolicy): CellBuilder<T>
@@ -197,10 +189,6 @@ interface CellBuilder<out T : JComponent> {
 
   @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  fun visible(isVisible: Boolean)
-
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun visibleIf(predicate: ComponentPredicate): CellBuilder<T>
 
   @Deprecated("Use Kotlin UI DSL Version 2")
@@ -210,10 +198,6 @@ interface CellBuilder<out T : JComponent> {
   @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   fun withLargeLeftGap(): CellBuilder<T>
-
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  fun withLeftGap(): CellBuilder<T>
 }
 
 @ApiStatus.ScheduledForRemoval
@@ -230,12 +214,6 @@ private fun <T : JComponent> CellBuilder<T>.intApplyToComponent(task: T.() -> Un
 @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
 fun <T : JTextComponent> CellBuilder<T>.withTextBinding(modelBinding: PropertyBinding<String>): CellBuilder<T> {
   return withBindingInt(JTextComponent::getText, JTextComponent::setText, modelBinding)
-}
-
-@ApiStatus.ScheduledForRemoval
-@Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-fun <T : AbstractButton> CellBuilder<T>.withSelectedBinding(modelBinding: PropertyBinding<Boolean>): CellBuilder<T> {
-  return withBindingInt(AbstractButton::isSelected, AbstractButton::setSelected, modelBinding)
 }
 
 @get:Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
@@ -261,13 +239,6 @@ abstract class Cell : BaseBuilder {
   @ApiStatus.ScheduledForRemoval
   @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
   val grow: CCFlags = CCFlags.grow
-
-  /**
-   * Makes the column that the component is residing in grow with `weight`.
-   */
-  @ApiStatus.ScheduledForRemoval
-  @Deprecated("Use Kotlin UI DSL Version 2", level = DeprecationLevel.HIDDEN)
-  val pushX: CCFlags = CCFlags.pushX
 
   /**
    * Makes the row that the component is residing in grow with `weight`.

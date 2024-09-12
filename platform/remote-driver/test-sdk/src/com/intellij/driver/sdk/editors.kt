@@ -19,6 +19,7 @@ interface Editor {
   fun offsetToVisualPosition(offset: Int): VisualPosition
   fun visualPositionToXY(visible: VisualPosition): Point
   fun getInlayModel(): InlayModel
+  fun getColorsScheme(): EditorColorsScheme
 }
 @Remote("com.intellij.openapi.editor.VisualPosition")
 interface VisualPosition {
@@ -92,6 +93,11 @@ interface FileEditorManager {
   fun getSelectedTextEditor(): Editor?
 }
 
+@Remote("com.intellij.openapi.editor.colors.EditorColorsScheme")
+interface EditorColorsScheme {
+  fun getEditorFontSize(): Int
+}
+
 fun Driver.openEditor(file: VirtualFile, project: Project? = null): Array<FileEditor> {
   return withContext(OnDispatcher.EDT) {
     service<FileEditorManager>(project ?: singleProject()).openFile(file, true, false)
@@ -104,7 +110,7 @@ fun Driver.openFile(relativePath: String, project: Project = singleProject(), wa
     if (fileToOpen == null) {
       throw IllegalArgumentException("Fail to find file $relativePath")
     }
-    openEditor(file = fileToOpen)
+    openEditor(fileToOpen, project)
     fileToOpen
   }
   else {
@@ -122,6 +128,6 @@ fun Driver.openFile(relativePath: String, project: Project = singleProject(), wa
     }
   }
   if (waitForCodeAnalysis) {
-    waitForCodeAnalysis(file = openedFile)
+    waitForCodeAnalysis(project, openedFile)
   }
 }

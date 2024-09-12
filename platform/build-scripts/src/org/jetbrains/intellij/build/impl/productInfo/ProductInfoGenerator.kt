@@ -41,18 +41,20 @@ internal fun generateProductInfoJson(
   else {
     emptyList()
   }
-  val productFlavors = context.productProperties.getProductFlavors(context).map { ProductFlavorData(it) }
+  val productProperties = context.productProperties
+  val productFlavors = productProperties.getProductFlavors(context).map { ProductFlavorData(it) }
   val json = ProductInfoData(
     name = appInfo.fullProductName,
     version = appInfo.fullVersion,
     versionSuffix = appInfo.versionSuffix,
     buildNumber = context.buildNumber,
     productCode = appInfo.productCode,
+    envVarBaseName = productProperties.getEnvironmentVariableBaseName(appInfo),
     dataDirectoryName = context.systemSelector,
-    svgIconPath = if (appInfo.svgRelativePath == null) null else "${relativePathToBin}/${context.productProperties.baseFileName}.svg",
+    svgIconPath = if (appInfo.svgRelativePath == null) null else "${relativePathToBin}/${productProperties.baseFileName}.svg",
     productVendor = appInfo.shortCompanyName,
     launch = launch,
-    customProperties = context.productProperties.generateCustomPropertiesForProductInfo(),
+    customProperties = productProperties.generateCustomPropertiesForProductInfo(),
     bundledPlugins = builtinModules?.plugins ?: emptyList(),
     fileExtensions = builtinModules?.fileExtensions ?: emptyList(),
 
@@ -70,13 +72,13 @@ internal fun writeProductInfoJson(targetFile: Path, json: String, context: Build
   Files.setLastModifiedTime(targetFile, FileTime.from(context.options.buildDateInSeconds, TimeUnit.SECONDS))
 }
 
-internal fun generateJetBrainsClientLaunchData(
-  ideContext: BuildContext,
+internal suspend fun generateJetBrainsClientLaunchData(
   arch: JvmArchitecture,
   os: OsFamily,
+  ideContext: BuildContext,
   vmOptionsFilePath: (BuildContext) -> String
-): CustomCommandLaunchData? =
-  createJetBrainsClientContextForLaunchers(ideContext)?.let { clientContext ->
+): CustomCommandLaunchData? {
+  return createJetBrainsClientContextForLaunchers(ideContext)?.let { clientContext ->
     CustomCommandLaunchData(
       commands = listOf("thinClient", "thinClient-headless", "installFrontendPlugins"),
       vmOptionsFilePath = vmOptionsFilePath(clientContext),
@@ -86,10 +88,11 @@ internal fun generateJetBrainsClientLaunchData(
       dataDirectoryName = clientContext.systemSelector,
     )
   }
+}
 
 /**
- * Describes the format of JSON file containing meta-information about a product installation.
- * Must be consistent with 'product-info.schema.json' file.
+ * Describes the format of a JSON file containing meta-information about a product installation.
+ * Must be consistent with the `product-info.schema.json` file.
  */
 @Serializable
 data class ProductInfoData(
@@ -98,6 +101,7 @@ data class ProductInfoData(
   val versionSuffix: String?,
   val buildNumber: String,
   val productCode: String,
+  val envVarBaseName: String,
   val dataDirectoryName: String,
   val svgIconPath: String?,
   val productVendor: String,

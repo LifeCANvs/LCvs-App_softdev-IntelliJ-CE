@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.plugins.marketplace
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -10,12 +10,12 @@ import com.intellij.ide.plugins.newui.Tags
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.text.StringUtil.parseLong
 import com.intellij.openapi.util.text.StringUtil.unquoteString
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import java.util.*
 
 /**
  * Object from Search Service for getting compatible updates for IDE.
- * [externalUpdateId] update ID from Plugin Repository database.
  * [externalPluginId] plugin ID from Plugin Repository database.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -33,7 +33,7 @@ data class IdeCompatibleUpdate(
  * Plugin Repository object for storing information about plugin updates.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class IntellijUpdateMetadata(
+internal data class IntellijUpdateMetadata(
   @get:JsonProperty("xmlId")
   val id: String = "",
   val name: String = "",
@@ -108,6 +108,7 @@ internal class MarketplaceSearchPluginData(
   }
 }
 
+@ApiStatus.Internal
 @JsonIgnoreProperties(ignoreUnknown = true)
 class NearestUpdate(
   @get:JsonProperty("id")
@@ -130,7 +131,7 @@ class NearestUpdate(
 internal class AggregationSearchResponse(val aggregations: Map<String, Int> = emptyMap(), val total: Int = 0)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class FeatureImpl(
+internal data class FeatureImpl(
   val pluginId: String? = null,
   val pluginName: String? = null,
   val description: String? = null,
@@ -159,7 +160,7 @@ data class FeatureImpl(
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-class MarketplaceBrokenPlugin(
+internal class MarketplaceBrokenPlugin(
   val id: String = "",
   val version: String = "",
   val since: String? = null,
@@ -168,6 +169,7 @@ class MarketplaceBrokenPlugin(
   val originalUntil: String? = null
 )
 
+@ApiStatus.Internal
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PluginReviewComment(
   val id: String = "",
@@ -180,23 +182,32 @@ data class PluginReviewComment(
   fun getDate(): Long = parseLong(cdate, 0)
 }
 
+@ApiStatus.Internal
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ReviewCommentAuthor(
   val name: @Nls String = ""
 )
 
+@ApiStatus.Internal
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ReviewCommentPlugin(
   val link: @Nls String = ""
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class SalesMetadata(
-  val trialPeriod: Int? = null
+internal data class SalesMetadata(
+  val trialPeriod: Int? = null,
+  val customTrialPeriods: List<CustomTrialPeriod>? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class IntellijPluginMetadata(
+internal data class CustomTrialPeriod(
+  @JsonProperty("productCode") val productCode: String,
+  @JsonProperty("trialPeriod") val trialPeriod: Int
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+internal data class IntellijPluginMetadata(
   val screenshots: List<String>? = null,
   val vendor: PluginVendorMetadata? = null,
   val forumUrl: String? = null,
@@ -220,12 +231,15 @@ data class IntellijPluginMetadata(
     pluginNode.documentationUrl = documentationUrl
     pluginNode.sourceCodeUrl = sourceCodeUrl
     pluginNode.reportPluginUrl = reportPluginUrl
-    pluginNode.trialPeriod = salesInfo?.trialPeriod
+    pluginNode.defaultTrialPeriod = salesInfo?.trialPeriod
+    pluginNode.setCustomTrialPeriodMap(salesInfo?.customTrialPeriods?.associate {
+      p -> p.productCode to p.trialPeriod
+    })
   }
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PluginVendorMetadata(
+internal data class PluginVendorMetadata(
   val name: String = "",
   @get:JsonProperty("isTrader")
   val trader: Boolean = false,

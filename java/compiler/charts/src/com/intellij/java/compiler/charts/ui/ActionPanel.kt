@@ -6,6 +6,7 @@ import com.intellij.java.compiler.charts.CompilationChartsBundle
 import com.intellij.java.compiler.charts.CompilationChartsViewModel
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
+import com.intellij.openapi.client.ClientSystemInfo
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.IconButton
@@ -22,14 +23,13 @@ import com.intellij.util.ui.components.BorderLayoutPanel
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.event.InputEvent.CTRL_DOWN_MASK
+import java.awt.event.InputEvent.META_DOWN_MASK
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import javax.swing.BorderFactory
-import javax.swing.BoxLayout
-import javax.swing.JComponent
-import javax.swing.JPanel
+import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
@@ -68,7 +68,8 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
           if (words.isEmpty()) {
             vm.filter.set(vm.filter.value.setText(listOf()))
             updateLabel(null, null)
-          } else {
+          }
+          else {
             vm.filter.set(vm.filter.value.setText(words))
             updateLabel(vm.modules.get().keys, vm.filter.value)
           }
@@ -82,6 +83,7 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
       })
       border = JBUI.Borders.empty(1)
       BoxLayout(this, BoxLayout.LINE_AXIS)
+      background = COLOR_BACKGROUND
     }
   }
 
@@ -91,7 +93,7 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
   }
 
   init {
-    border = JBUI.Borders.emptyBottom(2)
+    border = JBUI.Borders.customLine(COLOR_LINE)
     layout = BorderLayout()
 
     // module name
@@ -104,7 +106,14 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
     })
 
     // legend
-    val actionGroup = DefaultActionGroup(listOf(CompilationChartsStatsActionHolder(vm), Separator(), ScrollToEndAction(vm)))
+    val actionGroup = DefaultActionGroup(listOf(
+      CompilationChartsStatsActionHolder(vm),
+      Separator(),
+      ZoomResetAction(vm, component),
+      ZoomOutAction(vm, component),
+      ZoomInAction(vm, component),
+      ScrollToEndAction(vm))
+    )
     val toolbar = ActionManager.getInstance().createActionToolbar(COMPILATION_CHARTS_TOOLBAR_NAME, actionGroup, true).apply {
       targetComponent = this@ActionPanel
     }
@@ -121,21 +130,60 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
   fun updateLabel(set: Set<CompilationChartsViewModel.Modules.EventKey>?, filter: CompilationChartsViewModel.Filter?) {
     if (set == null || filter == null) {
       countLabel.text = ""
-    } else {
+    }
+    else {
       val count = set.count { filter.test(it) }
       if (count == set.count()) {
         countLabel.text = ""
-      } else {
+      }
+      else {
         countLabel.text = CompilationChartsBundle.message("charts.search.results", count)
       }
     }
   }
 
-  private class ScrollToEndAction(private val vm : CompilationChartsViewModel): DumbAwareAction(
+  private class ScrollToEndAction(private val vm: CompilationChartsViewModel) : DumbAwareAction(
     CompilationChartsBundle.message("charts.scroll.to.end.action.title"),
     CompilationChartsBundle.message("charts.scroll.to.end.action.description"),
     AllIcons.Actions.Forward) {
     override fun actionPerformed(e: AnActionEvent) = vm.requestScrollToEnd()
+  }
+
+  private class ZoomInAction(private val vm: CompilationChartsViewModel, component: JComponent) : DumbAwareAction(
+    CompilationChartsBundle.message("charts.zoom.in.action.title"),
+    CompilationChartsBundle.message("charts.zoom.in.action.description"),
+    AllIcons.Graph.ZoomIn
+  ) {
+    init {
+      registerCustomShortcutSet(ActionManager.getInstance().getAction(IdeActions.ACTION_EXPAND_ALL).shortcutSet, component)
+    }
+
+    override fun actionPerformed(e: AnActionEvent) = vm.requestZoomChange(CompilationChartsViewModel.ZoomEvent.In())
+  }
+
+  private class ZoomOutAction(private val vm: CompilationChartsViewModel, component: JComponent) : DumbAwareAction(
+    CompilationChartsBundle.message("charts.zoom.out.action.title"),
+    CompilationChartsBundle.message("charts.zoom.out.action.description"),
+    AllIcons.Graph.ZoomOut
+  ) {
+    init {
+      registerCustomShortcutSet(ActionManager.getInstance().getAction(IdeActions.ACTION_COLLAPSE_ALL).shortcutSet, component)
+    }
+
+    override fun actionPerformed(e: AnActionEvent) = vm.requestZoomChange(CompilationChartsViewModel.ZoomEvent.Out())
+  }
+
+
+  private class ZoomResetAction(private val vm: CompilationChartsViewModel, component: JComponent) : DumbAwareAction(
+    CompilationChartsBundle.message("charts.zoom.reset.action.title"),
+    CompilationChartsBundle.message("charts.zoom.reset.action.description"),
+    AllIcons.Graph.ActualZoom
+  ) {
+    init {
+      registerCustomShortcutSet(CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_0, SHORTCUT_MODIFIER_MASK_NUMBER)), component)
+    }
+
+    override fun actionPerformed(e: AnActionEvent) = vm.requestZoomChange(CompilationChartsViewModel.ZoomEvent.Reset)
   }
 
   private class CompilationChartsStatsActionHolder(private val vm: CompilationChartsViewModel) : DumbAwareAction(), CustomComponentAction {
@@ -233,6 +281,8 @@ class ActionPanel(private val project: Project, private val vm: CompilationChart
   }
 
   companion object {
+    private val SHORTCUT_MODIFIER_MASK_NUMBER
+      get() = if (ClientSystemInfo.isMac()) META_DOWN_MASK else CTRL_DOWN_MASK
     private const val COMPILATION_CHARTS_TOOLBAR_NAME = "Compilation charts toolbar"
   }
 }

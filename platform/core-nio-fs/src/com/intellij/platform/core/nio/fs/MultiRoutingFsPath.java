@@ -8,11 +8,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
 import java.util.Objects;
 
-
-final class MultiRoutingFsPath implements Path {
+@SuppressWarnings("UnnecessaryFullyQualifiedName")
+final class MultiRoutingFsPath implements Path, sun.nio.fs.BasicFileAttributesHolder {
   private final Path myDelegate;
   private final MultiRoutingFileSystem myFileSystem;
 
@@ -36,17 +37,17 @@ final class MultiRoutingFsPath implements Path {
   }
 
   @Override
-  public Path getRoot() {
+  public MultiRoutingFsPath getRoot() {
     return wrap(myDelegate.getRoot());
   }
 
   @Override
-  public Path getFileName() {
+  public MultiRoutingFsPath getFileName() {
     return wrap(myDelegate.getFileName());
   }
 
   @Override
-  public Path getParent() {
+  public MultiRoutingFsPath getParent() {
     return wrap(myDelegate.getParent());
   }
 
@@ -56,12 +57,12 @@ final class MultiRoutingFsPath implements Path {
   }
 
   @Override
-  public Path getName(int index) {
+  public MultiRoutingFsPath getName(int index) {
     return wrap(myDelegate.getName(index));
   }
 
   @Override
-  public Path subpath(int beginIndex, int endIndex) {
+  public MultiRoutingFsPath subpath(int beginIndex, int endIndex) {
     return wrap(myDelegate.subpath(beginIndex, endIndex));
   }
 
@@ -88,32 +89,32 @@ final class MultiRoutingFsPath implements Path {
   }
 
   @Override
-  public Path normalize() {
+  public MultiRoutingFsPath normalize() {
     return wrap(myDelegate.normalize());
   }
 
   @Override
-  public Path resolve(Path other) {
+  public MultiRoutingFsPath resolve(Path other) {
     return wrap(myDelegate.resolve(unwrap(other)));
   }
 
   @Override
-  public Path resolve(String other) {
+  public MultiRoutingFsPath resolve(String other) {
     return wrap(myDelegate.resolve(other));
   }
 
   @Override
-  public Path resolveSibling(Path other) {
+  public MultiRoutingFsPath resolveSibling(Path other) {
     return wrap(myDelegate.resolveSibling(unwrap(other)));
   }
 
   @Override
-  public Path resolveSibling(String other) {
+  public MultiRoutingFsPath resolveSibling(String other) {
     return wrap(myDelegate.resolveSibling(other));
   }
 
   @Override
-  public Path relativize(Path other) {
+  public MultiRoutingFsPath relativize(Path other) {
     return wrap(myDelegate.relativize(unwrap(other)));
   }
 
@@ -123,12 +124,12 @@ final class MultiRoutingFsPath implements Path {
   }
 
   @Override
-  public Path toAbsolutePath() {
+  public MultiRoutingFsPath toAbsolutePath() {
     return wrap(myDelegate.toAbsolutePath());
   }
 
   @Override
-  public Path toRealPath(LinkOption... options) throws IOException {
+  public MultiRoutingFsPath toRealPath(LinkOption... options) throws IOException {
     return wrap(myDelegate.toRealPath(options));
   }
 
@@ -163,7 +164,7 @@ final class MultiRoutingFsPath implements Path {
       }
 
       @Override
-      public Path next() {
+      public MultiRoutingFsPath next() {
         return wrap(iterator.next());
       }
     };
@@ -187,8 +188,29 @@ final class MultiRoutingFsPath implements Path {
     else if (path instanceof MultiRoutingFsPath) {
       return (MultiRoutingFsPath)path;
     }
+    else if (path == myDelegate /* intentional reference comparison */) {
+      // Some methods like `toAbsolutePath` return the same instance if the path is already absolute.
+      // Some other methods like `getFileName` don't declare such an intention in their documentation
+      // but deduplicate paths in their default implementations.
+      return this;
+    }
     else {
       return new MultiRoutingFsPath(myFileSystem, path);
+    }
+  }
+
+  @Override
+  public BasicFileAttributes get() {
+    if (myDelegate instanceof sun.nio.fs.BasicFileAttributesHolder) {
+      return ((sun.nio.fs.BasicFileAttributesHolder)myDelegate).get();
+    }
+    return null;
+  }
+
+  @Override
+  public void invalidate() {
+    if (myDelegate instanceof sun.nio.fs.BasicFileAttributesHolder) {
+      ((sun.nio.fs.BasicFileAttributesHolder)myDelegate).invalidate();
     }
   }
 

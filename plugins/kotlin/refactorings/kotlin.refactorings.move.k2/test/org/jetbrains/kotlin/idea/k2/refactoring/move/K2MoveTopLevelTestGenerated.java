@@ -35,6 +35,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/java/moveTopLevelClassToAnotherPackage/moveTopLevelClassToAnotherPackage.test");
     }
 
+    @TestMetadata("kotlin/callableReference/callableReference.test")
+    public void testKotlin_callableReference_CallableReference() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/callableReference/callableReference.test");
+    }
+
     @TestMetadata("kotlin/callsAndCallableRefs/internalUsages/differentSourceAndTargetWithFqNames/differentSourceAndTargetWithFqNames.test")
     public void testKotlin_callsAndCallableRefs_internalUsages_differentSourceAndTargetWithFqNames_DifferentSourceAndTargetWithFqNames() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/callsAndCallableRefs/internalUsages/differentSourceAndTargetWithFqNames/differentSourceAndTargetWithFqNames.test");
@@ -240,6 +245,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveClassWithLongFunction/moveClassWithLongFunction.test");
     }
 
+    @TestMetadata("kotlin/moveCollectionLiteralUsage/moveCollectionLiteralUsage.test")
+    public void testKotlin_moveCollectionLiteralUsage_MoveCollectionLiteralUsage() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveCollectionLiteralUsage/moveCollectionLiteralUsage.test");
+    }
+
     @TestMetadata("kotlin/moveEscapedKeyword/moveEscapedKeyword.test")
     public void testKotlin_moveEscapedKeyword_MoveEscapedKeyword() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveEscapedKeyword/moveEscapedKeyword.test");
@@ -273,6 +283,11 @@ public class K2MoveTopLevelTestGenerated extends AbstractK2MoveTopLevelTest {
     @TestMetadata("kotlin/moveFunctionWithImportsRetained/moveFunctionWithImportsRetained.test")
     public void testKotlin_moveFunctionWithImportsRetained_MoveFunctionWithImportsRetained() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveFunctionWithImportsRetained/moveFunctionWithImportsRetained.test");
+    }
+
+    @TestMetadata("kotlin/moveMultipleWithComments/moveMultipleWithComments.test")
+    public void testKotlin_moveMultipleWithComments_MoveMultipleWithComments() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveTopLevel/kotlin/moveMultipleWithComments/moveMultipleWithComments.test");
     }
 
     @TestMetadata("kotlin/moveObjectToFile/moveObjectToFile.test")

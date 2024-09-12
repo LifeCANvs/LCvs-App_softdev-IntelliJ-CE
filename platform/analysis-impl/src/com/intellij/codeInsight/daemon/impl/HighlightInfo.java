@@ -76,6 +76,7 @@ public class HighlightInfo implements Segment {
   private static final byte UNRESOLVED_REFERENCE_QUICK_FIXES_COMPUTED_MASK = 0x20;
 
   // this HighlightInfo was created during visiting PsiElement with this range
+  @Deprecated
   private RangeMarker visitingRange;
 
   @MagicConstant(intValues = {HAS_HINT_MASK, FROM_INJECTION_MASK, AFTER_END_OF_LINE_MASK, FILE_LEVEL_ANNOTATION_MASK, NEEDS_UPDATE_ON_TYPING_MASK, UNRESOLVED_REFERENCE_QUICK_FIXES_COMPUTED_MASK})
@@ -98,6 +99,86 @@ public class HighlightInfo implements Segment {
    */
   @Deprecated
   public List<Pair<IntentionActionDescriptor, RangeMarker>> quickFixActionMarkers;
+
+  private final @DetailedDescription String description;
+  private final @Tooltip String toolTip;
+  private final @NotNull HighlightSeverity severity;
+  private final GutterMark gutterIconRenderer;
+  private final ProblemGroup myProblemGroup;
+  volatile Object toolId; // inspection.getShortName() in case when the inspection generated this info; Class<Annotator> in case of annotators, etc
+  private int group;
+  /**
+   * Quick fix text range: the range within which the Alt-Enter should open the quick fix popup.
+   * Might be bigger than (getStartOffset(), getEndOffset()) when it's deemed more usable,
+   * e.g., when "import class" fix wanted to be Alt-Entered from everywhere at the same line.
+   *
+   */
+  private long fixRange;
+  /**
+   * @see FlagConstant for allowed values
+   */
+  private volatile byte myFlags;
+
+  final int navigationShift;
+
+  private @Nullable Object fileLevelComponentsStorage;
+
+  private @Nullable("null means it the same as highlighter") RangeMarker fixMarker;
+  volatile RangeHighlighterEx highlighter;
+  /**
+   * in case this HighlightInfo is created to highlight unresolved reference, store this reference here to be able to call {@link com.intellij.codeInsight.quickfix.UnresolvedReferenceQuickFixProvider} later
+   */
+  final PsiReference unresolvedReference;
+
+  private final @Nullable Integer layerOverride;
+
+  /**
+   * @deprecated Do not create manually, use {@link #newHighlightInfo(HighlightInfoType)} instead
+   */
+  @Deprecated
+  @ApiStatus.Internal
+  protected HighlightInfo(@Nullable TextAttributes forcedTextAttributes,
+                          @Nullable TextAttributesKey forcedTextAttributesKey,
+                          @NotNull HighlightInfoType type,
+                          int startOffset,
+                          int endOffset,
+                          @Nullable @DetailedDescription String escapedDescription,
+                          @Nullable @Tooltip String escapedToolTip,
+                          @NotNull HighlightSeverity severity,
+                          boolean afterEndOfLine,
+                          @Nullable Boolean needsUpdateOnTyping,
+                          boolean isFileLevelAnnotation,
+                          int navigationShift,
+                          @Nullable ProblemGroup problemGroup,
+                          @Nullable Object toolId,
+                          @Nullable GutterMark gutterIconRenderer,
+                          int group,
+                          @Nullable PsiReference unresolvedReference,
+                          @Nullable Integer layerOverride) {
+    if (startOffset < 0 || startOffset > endOffset) {
+      LOG.error("Incorrect highlightInfo bounds. description="+escapedDescription+"; startOffset="+startOffset+"; endOffset="+endOffset+";type="+type);
+    }
+    this.forcedTextAttributes = forcedTextAttributes;
+    this.forcedTextAttributesKey = forcedTextAttributesKey;
+    this.type = type;
+    this.startOffset = startOffset;
+    this.endOffset = endOffset;
+    fixRange = TextRangeScalarUtil.toScalarRange(startOffset, endOffset);
+    description = escapedDescription;
+    // optimization: do not retain extra memory if we can recompute
+    toolTip = encodeTooltip(escapedToolTip, escapedDescription);
+    this.severity = severity;
+    myFlags = (byte)((afterEndOfLine ? AFTER_END_OF_LINE_MASK : 0) |
+                     (calcNeedUpdateOnTyping(needsUpdateOnTyping, type) ? NEEDS_UPDATE_ON_TYPING_MASK : 0) |
+                     (isFileLevelAnnotation ? FILE_LEVEL_ANNOTATION_MASK : 0));
+    this.navigationShift = navigationShift;
+    myProblemGroup = problemGroup;
+    this.gutterIconRenderer = gutterIconRenderer;
+    this.toolId = toolId;
+    this.group = group;
+    this.unresolvedReference = unresolvedReference;
+    this.layerOverride = layerOverride;
+  }
 
   /**
    * Find the quickfix (among ones added by {@link #registerFix}) selected by returning non-null value from the {@code predicate}
@@ -134,82 +215,6 @@ public class HighlightInfo implements Segment {
       }
     }
     return null;
-  }
-
-  private final @DetailedDescription String description;
-  private final @Tooltip String toolTip;
-  private final @NotNull HighlightSeverity severity;
-  private final GutterMark gutterIconRenderer;
-  private final ProblemGroup myProblemGroup;
-  volatile Object toolId; // inspection.getShortName() in case when the inspection generated this info; Class<Annotator> in case of annotators, etc
-  private int group;
-  /**
-   * Quick fix text range: the range within which the Alt-Enter should open the quick fix popup.
-   * Might be bigger than (getStartOffset(), getEndOffset()) when it's deemed more usable,
-   * e.g., when "import class" fix wanted to be Alt-Entered from everywhere at the same line.
-   *
-   */
-  private long fixRange;
-  /**
-   * @see FlagConstant for allowed values
-   */
-  private volatile byte myFlags;
-
-  final int navigationShift;
-
-  private @Nullable Object fileLevelComponentsStorage;
-
-  private @Nullable("null means it the same as highlighter") RangeMarker fixMarker;
-  volatile RangeHighlighterEx highlighter;
-  /**
-   * in case this HighlightInfo is created to highlight unresolved reference, store this reference here to be able to call {@link com.intellij.codeInsight.quickfix.UnresolvedReferenceQuickFixProvider} later
-   */
-  final PsiReference unresolvedReference;
-
-  /**
-   * @deprecated Do not create manually, use {@link #newHighlightInfo(HighlightInfoType)} instead
-   */
-  @Deprecated
-  @ApiStatus.Internal
-  protected HighlightInfo(@Nullable TextAttributes forcedTextAttributes,
-                          @Nullable TextAttributesKey forcedTextAttributesKey,
-                          @NotNull HighlightInfoType type,
-                          int startOffset,
-                          int endOffset,
-                          @Nullable @DetailedDescription String escapedDescription,
-                          @Nullable @Tooltip String escapedToolTip,
-                          @NotNull HighlightSeverity severity,
-                          boolean afterEndOfLine,
-                          @Nullable Boolean needsUpdateOnTyping,
-                          boolean isFileLevelAnnotation,
-                          int navigationShift,
-                          @Nullable ProblemGroup problemGroup,
-                          @Nullable Object toolId,
-                          @Nullable GutterMark gutterIconRenderer,
-                          int group,
-                          @Nullable PsiReference unresolvedReference) {
-    if (startOffset < 0 || startOffset > endOffset) {
-      LOG.error("Incorrect highlightInfo bounds. description="+escapedDescription+"; startOffset="+startOffset+"; endOffset="+endOffset+";type="+type);
-    }
-    this.forcedTextAttributes = forcedTextAttributes;
-    this.forcedTextAttributesKey = forcedTextAttributesKey;
-    this.type = type;
-    this.startOffset = startOffset;
-    this.endOffset = endOffset;
-    fixRange = TextRangeScalarUtil.toScalarRange(startOffset, endOffset);
-    description = escapedDescription;
-    // optimization: do not retain extra memory if we can recompute
-    toolTip = encodeTooltip(escapedToolTip, escapedDescription);
-    this.severity = severity;
-    myFlags = (byte)((afterEndOfLine ? AFTER_END_OF_LINE_MASK : 0) |
-                     (calcNeedUpdateOnTyping(needsUpdateOnTyping, type) ? NEEDS_UPDATE_ON_TYPING_MASK : 0) |
-                     (isFileLevelAnnotation ? FILE_LEVEL_ANNOTATION_MASK : 0));
-    this.navigationShift = navigationShift;
-    myProblemGroup = problemGroup;
-    this.gutterIconRenderer = gutterIconRenderer;
-    this.toolId = toolId;
-    this.group = group;
-    this.unresolvedReference = unresolvedReference;
   }
 
   /**
@@ -499,6 +504,9 @@ public class HighlightInfo implements Segment {
   @Override
   public @NonNls String toString() {
     String s = "HighlightInfo(" + getStartOffset() + "," + getEndOffset() + ")";
+    if (isFileLevelAnnotation()) {
+      s+=" (file level)";
+    }
     if (getStartOffset() != startOffset || getEndOffset() != endOffset) {
       s += "; created as: (" + startOffset + "," + endOffset + ")";
     }
@@ -595,6 +603,9 @@ public class HighlightInfo implements Segment {
       return registerFix(action.asIntention(), options, displayName, fixRange, key);
     }
 
+    @ApiStatus.Internal
+    @NotNull Builder overrideLayer(int layer);
+
     @Nullable("null means filtered out")
     HighlightInfo create();
 
@@ -635,7 +646,7 @@ public class HighlightInfo implements Segment {
       annotation.getMessage(), annotation.getTooltip(), annotation.getSeverity(), annotation.isAfterEndOfLine(),
       annotation.needsUpdateOnTyping(),
       annotation.isFileLevelAnnotation(), 0, annotation.getProblemGroup(), annotatorClass, annotation.getGutterIconRenderer(), Pass.UPDATE_ALL,
-      annotation.getUnresolvedReference());
+      annotation.getUnresolvedReference(), null);
 
     List<? extends Annotation.QuickFixInfo> fixes = batchMode ? annotation.getBatchFixes() : annotation.getQuickFixes();
     if (fixes != null) {
@@ -701,12 +712,12 @@ public class HighlightInfo implements Segment {
 
   public int getActualStartOffset() {
     RangeHighlighterEx h = highlighter;
-    return h == null || !h.isValid() ? startOffset : h.getStartOffset();
+    return h == null || !h.isValid() || isFileLevelAnnotation() ? startOffset : h.getStartOffset();
   }
 
   public int getActualEndOffset() {
     RangeHighlighterEx h = highlighter;
-    return h == null || !h.isValid() ? endOffset : h.getEndOffset();
+    return h == null || !h.isValid()  || isFileLevelAnnotation() ? endOffset : h.getEndOffset();
   }
 
   public static class IntentionActionDescriptor {
@@ -1083,17 +1094,25 @@ public class HighlightInfo implements Segment {
   void setUnresolvedReferenceQuickFixesComputed() {
     setFlag(UNRESOLVED_REFERENCE_QUICK_FIXES_COMPUTED_MASK, true);
   }
+  @ApiStatus.Internal
   boolean isFromAnnotator() {
     return HighlightInfoUpdaterImpl.isAnnotatorToolId(toolId);
   }
-
+  @ApiStatus.Internal
   boolean isFromInspection() {
     return HighlightInfoUpdaterImpl.isInspectionToolId(toolId);
   }
+  @ApiStatus.Internal
   boolean isFromHighlightVisitor() {
     return HighlightInfoUpdaterImpl.isHighlightVisitorToolId(toolId);
   }
+  @ApiStatus.Internal
   boolean isInjectionRelated() {
     return HighlightInfoUpdaterImpl.isInjectionRelated(toolId);
   }
+
+  @ApiStatus.Internal
+  boolean isLayerOverriden() { return layerOverride != null; }
+  @ApiStatus.Internal
+  int getLayerOverride() { Objects.requireNonNull(layerOverride); return layerOverride; }
 }

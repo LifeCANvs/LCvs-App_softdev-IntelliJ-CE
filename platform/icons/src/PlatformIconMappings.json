@@ -378,7 +378,10 @@
       "informationDialog.svg": "general/informationDialog.svg",
       "layout.svg": "debugger/restoreLayout.svg",
       "left.svg": "actions/back.svg",
-      "listFiles.svg": "actions/listFiles.svg",
+      "listFiles.svg": [
+        "actions/annotate.svg",
+        "actions/listFiles.svg"
+      ],
       "locate.svg": "general/locate.svg",
       "locked.svg": "ide/readonly.svg",
       "moreHorizontal.svg": "actions/moreHorizontal.svg",
@@ -435,7 +438,10 @@
       "projectWideAnalysisOff.svg": "actions/projectWideAnalysisOff.svg",
       "projectWideAnalysisOn.svg": "actions/projectWideAnalysisOn.svg",
       "softWrap.svg": "actions/toggleSoftWrap.svg",
-      "showToImplement.svg": "general/show_to_implement.svg",
+      "showToImplement.svg": [
+        "general/implementingMethod.svg",
+        "general/show_to_implement.svg"
+      ],
       "scrollDown.svg": "runConfigurations/scroll_down.svg",
       "scrollUp.svg": "runConfigurations/scroll_up.svg",
       "projectStructure.svg": "general/projectStructure.svg",
@@ -496,7 +502,10 @@
       ]
     },
     "image": {
-      "actualZoom.svg": "graph/actualZoom.svg",
+      "actualZoom.svg": [
+        "general/actualZoom.svg",
+        "graph/actualZoom.svg"
+      ],
       "colorPicker.svg": "ide/pipette.svg",
       "grid.svg": "graph/grid.svg",
       "zoomIn.svg": "graph/zoomIn.svg",
@@ -573,6 +582,10 @@
       "webModuleGroup.svg": "javaee/webModuleGroup.svg",
       "webService.svg": "javaee/WebService.svg",
       "webServiceClient.svg": "javaee/WebServiceClient.svg"
+    },
+    "json": {
+      "object.svg": "json/object.svg",
+      "array.svg": "json/array.svg"
     },
     "language": {
       "php.svg": "language/php.svg",
@@ -667,6 +680,7 @@
         "nodes/propertyWriteStatic.svg"
       ],
       "record.svg": "nodes/record.svg",
+      "related.svg": "nodes/related.svg",
       "resourcesRoot.svg": "modules/resourcesRoot.svg",
       "resourceBundle.svg": "nodes/resourceBundle.svg",
       "servlet.svg": "nodes/servlet.svg",
@@ -807,6 +821,7 @@
     },
     "runConfigurations": {
       "application.svg": [
+        "general/projectTab.svg",
         "nodes/project.svg",
         "runConfigurations/application.svg",
         "runConfigurations/applet.svg"

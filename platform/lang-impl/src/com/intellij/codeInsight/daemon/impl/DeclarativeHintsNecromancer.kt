@@ -9,11 +9,14 @@ import com.intellij.codeInsight.hints.declarative.impl.*
 import com.intellij.codeInsight.hints.declarative.impl.util.TinyTree
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readActionBlocking
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.editor.impl.zombie.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.MarkupType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -66,10 +69,14 @@ private class DeclarativeHintsNecromancer(
         val editor = recipe.editorSupplier()
         withContext(Dispatchers.EDT) {
           if (recipe.isValid(editor)) {
-            inlayDataMap.forEach { (sourceId, inlayDataList) ->
-              DeclarativeInlayHintsPass.applyInlayData(editor, recipe.project, inlayDataList, sourceId)
+            //maybe readaction
+            writeIntentReadAction {
+              inlayDataMap.forEach { (sourceId, inlayDataList) ->
+                DeclarativeInlayHintsPass.applyInlayData(editor, recipe.project, inlayDataList, sourceId)
+              }
+              DeclarativeInlayHintsPassFactory.resetModificationStamp(editor)
+              FUSProjectHotStartUpMeasurer.markupRestored(recipe, MarkupType.DECLARATIVE_HINTS)
             }
-            DeclarativeInlayHintsPassFactory.resetModificationStamp(editor)
           }
         }
       }

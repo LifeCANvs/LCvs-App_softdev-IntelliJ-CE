@@ -30,6 +30,7 @@ import com.intellij.ide.util.treeView.smartTree.TreeElement;
 import com.intellij.internal.statistic.eventLog.events.EventFields;
 import com.intellij.internal.statistic.eventLog.events.EventPair;
 import com.intellij.internal.statistic.local.ContributorsLocalSummary;
+import com.intellij.internal.statistic.utils.StartMoment;
 import com.intellij.lang.LanguageStructureViewBuilder;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
@@ -54,6 +55,7 @@ import com.intellij.openapi.project.*;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.ui.popup.ListItemDescriptorAdapter;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
@@ -78,6 +80,7 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.fields.ExtendableTextComponent;
 import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.popup.PopupUpdateProcessorBase;
+import com.intellij.ui.popup.list.GroupedItemsListRenderer;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.usageView.UsageViewBundle;
@@ -121,7 +124,6 @@ import java.util.stream.Stream;
 import static com.intellij.ide.actions.searcheverywhere.PSIPresentationBgRendererWrapper.toPsi;
 import static com.intellij.ide.actions.searcheverywhere.SearchEverywhereManagerImpl.ALL_CONTRIBUTORS_GROUP_ID;
 import static com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTriggerCollector.getReportableContributorID;
-import static com.intellij.ui.dsl.listCellRenderer.BuilderKt.textListCellRenderer;
 
 /**
  * @author Konstantin Bulenkov
@@ -154,6 +156,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
   private final SearchFieldTypingListener mySearchTypingListener;
   private final HintHelper myHintHelper;
   private final SearchEverywhereMlService myMlService;
+  private final SearchPerformanceTracker mySearchPerformanceTracker;
   private final @Nullable SearchEverywhereSpellingCorrector mySpellingCorrector;
   private JComponent myExtendedInfoPanel;
   private @Nullable ExtendedInfoComponent myExtendedInfoComponent;
@@ -178,6 +181,14 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
   public SearchEverywhereUI(@Nullable Project project, List<SearchEverywhereContributor<?>> contributors,
                             @NotNull Function<? super String, String> shortcutSupplier,
                             @Nullable SearchEverywhereSpellingCorrector spellingCorrector) {
+    this(project, contributors, shortcutSupplier, spellingCorrector, null);
+  }
+
+  @ApiStatus.Internal
+  public SearchEverywhereUI(@Nullable Project project, List<SearchEverywhereContributor<?>> contributors,
+                            @NotNull Function<? super String, String> shortcutSupplier,
+                            @Nullable SearchEverywhereSpellingCorrector spellingCorrector,
+                            @Nullable StartMoment startMoment) {
     super(project);
 
     mySpellingCorrector = spellingCorrector;
@@ -255,9 +266,10 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     mySearchTypingListener = new SearchFieldTypingListener();
     mySearchField.addKeyListener(mySearchTypingListener);
 
-    SearchPerformanceTracker performanceTracker = new SearchPerformanceTracker(() -> myHeader.getSelectedTab().getID());
-    addSearchListener(performanceTracker);
-    Disposer.register(this, SearchFieldStatisticsCollector.createAndStart(mySearchField, performanceTracker, myMlService, myProject));
+    mySearchPerformanceTracker = new SearchPerformanceTracker(startMoment, () -> myHeader.getSelectedTab().getID());
+    addSearchListener(mySearchPerformanceTracker);
+    Disposer.register(this, SearchFieldStatisticsCollector.createAndStart(mySearchField, mySearchPerformanceTracker, myMlService, myProject,
+                                                                          startMoment));
   }
 
   public void addSearchListener(SearchListener listener) {
@@ -504,7 +516,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
   }
 
-  private static @Nullable Object getDataFromElementInfo(@NotNull String dataId, SearchEverywhereFoundElementInfo info) {
+  private static @Nullable Object getDataFromElementInfo(@NotNull String dataId, @NotNull SearchEverywhereFoundElementInfo info) {
     //noinspection unchecked
     SearchEverywhereContributor<Object> contributor = (SearchEverywhereContributor<Object>)info.getContributor();
     if (contributor == null) return null;
@@ -629,7 +641,12 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
         mySearchField.setText(text);
         mySearchField.selectAll();
       })
-      .setRenderer(textListCellRenderer((@Nls var s) -> s))
+      .setRenderer(new GroupedItemsListRenderer<>(new ListItemDescriptorAdapter<>() {
+        @Override
+        public @Nullable String getTextFor(@NlsContexts.ListItem String value) {
+          return value;
+        }
+      }))
       .createPopup()
       .show(relativePoint);
   }
@@ -1380,6 +1397,7 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     }
 
     if (closePopup) {
+      mySearchPerformanceTracker.popupIsClosedDueToSelection();
       closePopup();
     }
     else {
@@ -1939,11 +1957,6 @@ public final class SearchEverywhereUI extends BigPopupUI implements UiDataProvid
     @Override
     public @NotNull ListCellRenderer<? super Object> getElementsRenderer() {
       return myCommandRenderer;
-    }
-
-    @Override
-    public @Nullable Object getDataForItem(@NotNull Object element, @NotNull String dataId) {
-      return null;
     }
   };
 

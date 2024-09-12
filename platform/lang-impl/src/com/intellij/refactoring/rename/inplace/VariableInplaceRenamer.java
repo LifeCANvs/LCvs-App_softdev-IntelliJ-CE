@@ -15,6 +15,7 @@ import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.modcommand.ActionContext;
 import com.intellij.modcommand.ModCommandExecutor;
 import com.intellij.modcommand.ModUpdateFileText;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
@@ -432,7 +433,8 @@ public class VariableInplaceRenamer extends InplaceRefactoring {
         if (elementToRename != null && isRenamerFactoryApplicable(renamerFactory, elementToRename)) {
           final List<UsageInfo> usages = new ArrayList<>();
           final AutomaticRenamer renamer =
-            renamerFactory.createRenamer(elementToRename, newName, new ArrayList<>());
+            ActionUtil.underModalProgress(myProject, RefactoringBundle.message("progress.title.prepare.additional.searcher"), 
+                                          () -> renamerFactory.createRenamer(elementToRename, newName, new ArrayList<>()));
           if (renamer.hasAnythingToRename()) {
             if (!ApplicationManager.getApplication().isUnitTestMode()) {
               final AutomaticRenamingDialog renamingDialog = new AutomaticRenamingDialog(myProject, renamer);
@@ -460,11 +462,8 @@ public class VariableInplaceRenamer extends InplaceRefactoring {
                 }
               }
             };
-            if (ApplicationManager.getApplication().isUnitTestMode()) {
-              WriteCommandAction.writeCommandAction(myProject).withName(getCommandName()).run(performAutomaticRename);
-            } else {
-              ApplicationManager.getApplication().invokeLater(() -> WriteCommandAction.writeCommandAction(myProject).withName(getCommandName()).run(performAutomaticRename));
-            }
+            ApplicationManager.getApplication().invokeLater(
+              () -> WriteCommandAction.writeCommandAction(myProject).withName(getCommandName()).run(performAutomaticRename));
           }
         }
       }
@@ -525,7 +524,7 @@ public class VariableInplaceRenamer extends InplaceRefactoring {
         .finishOnUiThread(ModalityState.nonModal(), problem -> {
           if (problem == null) {
             if (mySnapshot != null) {
-              ApplicationManager.getApplication().runWriteAction(() -> mySnapshot.apply(myInsertedName));
+              WriteCommandAction.writeCommandAction(myProject).withName(getCommandName()).run(() -> mySnapshot.apply(myInsertedName));
             }
             performRefactoringRename(myInsertedName, myMarkAction);
           }

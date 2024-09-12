@@ -85,6 +85,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
                 runTest("testData/editor/optimizeImports/jvm/allUnderImports/ClassNameConflictWithinDefaultImports.kt");
             }
 
+            @TestMetadata("ClassesFromDefaultImportsDoNotConflictWithJavaUtilImport.kt")
+            public void testClassesFromDefaultImportsDoNotConflictWithJavaUtilImport() throws Exception {
+                runTest("testData/editor/optimizeImports/jvm/allUnderImports/ClassesFromDefaultImportsDoNotConflictWithJavaUtilImport.kt");
+            }
+
             @TestMetadata("ConflictWithAnnotation.kt")
             public void testConflictWithAnnotation() throws Exception {
                 runTest("testData/editor/optimizeImports/jvm/allUnderImports/ConflictWithAnnotation.kt");
@@ -113,6 +118,16 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
             @TestMetadata("NameCountSettingWithUnresolvedReference.kt")
             public void testNameCountSettingWithUnresolvedReference() throws Exception {
                 runTest("testData/editor/optimizeImports/jvm/allUnderImports/NameCountSettingWithUnresolvedReference.kt");
+            }
+
+            @TestMetadata("NestedClassesFromJavaAreConsideredMembers.kt")
+            public void testNestedClassesFromJavaAreConsideredMembers() throws Exception {
+                runTest("testData/editor/optimizeImports/jvm/allUnderImports/NestedClassesFromJavaAreConsideredMembers.kt");
+            }
+
+            @TestMetadata("NestedStaticMembersFromJavaAreConsideredMembers.kt")
+            public void testNestedStaticMembersFromJavaAreConsideredMembers() throws Exception {
+                runTest("testData/editor/optimizeImports/jvm/allUnderImports/NestedStaticMembersFromJavaAreConsideredMembers.kt");
             }
 
             @TestMetadata("PackagesToUseStarImport.kt")
@@ -264,6 +279,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
                 runTest("testData/editor/optimizeImports/jvm/SamConstructor.kt");
             }
 
+            @TestMetadata("StaticClassFromSuper.kt")
+            public void testStaticClassFromSuper() throws Exception {
+                runTest("testData/editor/optimizeImports/jvm/StaticClassFromSuper.kt");
+            }
+
             @TestMetadata("staticFromJava.kt")
             public void testStaticFromJava() throws Exception {
                 runTest("testData/editor/optimizeImports/jvm/staticFromJava.kt");
@@ -277,6 +297,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
             @TestMetadata("StaticMethodFromSuper.kt")
             public void testStaticMethodFromSuper() throws Exception {
                 runTest("testData/editor/optimizeImports/jvm/StaticMethodFromSuper.kt");
+            }
+
+            @TestMetadata("StaticMethodFromSuper_redundantImport.kt")
+            public void testStaticMethodFromSuper_redundantImport() throws Exception {
+                runTest("testData/editor/optimizeImports/jvm/StaticMethodFromSuper_redundantImport.kt");
             }
 
             @TestMetadata("ThisAndSuper.kt")
@@ -589,6 +614,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
                 runTest("testData/editor/optimizeImports/common/DefaultObjectReference.kt");
             }
 
+            @TestMetadata("EnumEntryUsedInsideEnum.kt")
+            public void testEnumEntryUsedInsideEnum() throws Exception {
+                runTest("testData/editor/optimizeImports/common/EnumEntryUsedInsideEnum.kt");
+            }
+
             @TestMetadata("Enums.kt")
             public void testEnums() throws Exception {
                 runTest("testData/editor/optimizeImports/common/Enums.kt");
@@ -672,6 +702,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
             @TestMetadata("InnerClassConstructor_superType.kt")
             public void testInnerClassConstructor_superType() throws Exception {
                 runTest("testData/editor/optimizeImports/common/InnerClassConstructor_superType.kt");
+            }
+
+            @TestMetadata("IntUnaryOperatorsAreNotUnresolvedOnLiterals.kt")
+            public void testIntUnaryOperatorsAreNotUnresolvedOnLiterals() throws Exception {
+                runTest("testData/editor/optimizeImports/common/IntUnaryOperatorsAreNotUnresolvedOnLiterals.kt");
             }
 
             @TestMetadata("InvokeFunction.kt")

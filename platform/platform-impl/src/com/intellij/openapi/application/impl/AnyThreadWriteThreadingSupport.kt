@@ -41,7 +41,7 @@ private class ThreadState(var permit: Permit? = null, var prevPermit: WriteInten
     permit = prevPermit
     prevPermit = null
   }
-
+  var writeIntentReleased = false
   val hasPermit get() = permit != null
   val hasRead get() = permit is ReadPermit
   val hasWriteIntent get() = permit is WriteIntentPermit
@@ -81,10 +81,13 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
       is WriteIntentPermit, is WritePermit -> release = false
     }
 
+    val prevImplicitLock = ThreadingAssertions.isImplicitLockOnEDT()
     try {
+      ThreadingAssertions.setImplicitLockOnEDT(false)
       return computation.compute()
     }
     finally {
+      ThreadingAssertions.setImplicitLockOnEDT(prevImplicitLock)
       if (release) {
         ts.release()
       }
@@ -106,21 +109,20 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
 
   override fun isWriteIntentLocked(): Boolean {
     val ts = myState.get()
+    // check for implicit
+    if (ts.hasWriteIntent && ThreadingAssertions.isImplicitLockOnEDT()) {
+      ThreadingAssertions.reportImplicitWriteIntent()
+    }
     return ts.hasWrite || ts.hasWriteIntent
   }
 
   override fun isReadAccessAllowed(): Boolean {
-    return myState.get().hasPermit
-  }
-
-  override fun runWithoutImplicitRead(runnable: Runnable) {
-    // There is no implicit read, as there is no write thread anymore
-    runnable.run()
-  }
-
-  override fun runWithImplicitRead(runnable: Runnable) {
-    // There is no implicit read, as there is no write thread anymore
-    runnable.run()
+    val ts = myState.get()
+    // check for implicit
+    if (ts.hasWriteIntent && ThreadingAssertions.isImplicitLockOnEDT()) {
+      ThreadingAssertions.reportImplicitRead()
+    }
+    return ts.hasPermit
   }
 
   override fun executeOnPooledThread(action: Runnable, expired: BooleanSupplier): Future<*> {
@@ -190,13 +192,21 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   override fun <T, E : Throwable?> runUnlockingIntendedWrite(action: ThrowableComputable<T, E>): T {
     val ts = myState.get()
     if (!ts.hasWriteIntent) {
-      return action.compute()
+      try {
+        ts.writeIntentReleased = true
+        return action.compute()
+      }
+      finally {
+        ts.writeIntentReleased = false
+      }
     }
     ts.release()
+    ts.writeIntentReleased = true
     try {
       return action.compute()
     }
     finally {
+      ts.writeIntentReleased = false
       ts.permit = getWriteIntentPermit()
     }
   }
@@ -225,10 +235,17 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
     fireBeforeReadActionStart(clazz)
     val ts = myState.get()
     if (ts.hasPermit) {
-      fireReadActionStarted(clazz)
-      val rv = block.compute()
-      fireReadActionFinished(clazz)
-      return rv
+      val prevImplicitLock = ThreadingAssertions.isImplicitLockOnEDT()
+      ThreadingAssertions.setImplicitLockOnEDT(false)
+      try {
+        fireReadActionStarted(clazz)
+        val rv = block.compute()
+        fireReadActionFinished(clazz)
+        return rv
+      }
+      finally {
+        ThreadingAssertions.setImplicitLockOnEDT(prevImplicitLock)
+      }
     }
     else {
       ts.permit = tryGetReadPermit()
@@ -260,6 +277,8 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
           } while (ts.permit == null)
         }
       }
+      val prevImplicitLock = ThreadingAssertions.isImplicitLockOnEDT()
+      ThreadingAssertions.setImplicitLockOnEDT(false)
       try {
         fireReadActionStarted(clazz)
         val rv = block.compute()
@@ -267,6 +286,7 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
         return rv
       }
       finally {
+        ThreadingAssertions.setImplicitLockOnEDT(prevImplicitLock)
         ts.release()
         fireAfterReadActionFinished(clazz)
       }
@@ -276,9 +296,16 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   override fun tryRunReadAction(action: Runnable): Boolean {
     val ts = myState.get()
     if (ts.hasPermit) {
-      fireReadActionStarted(action.javaClass)
-      action.run()
-      fireReadActionFinished(action.javaClass)
+      val prevImplicitLock = ThreadingAssertions.isImplicitLockOnEDT()
+      ThreadingAssertions.setImplicitLockOnEDT(false)
+      try {
+        fireReadActionStarted(action.javaClass)
+        action.run()
+        fireReadActionFinished(action.javaClass)
+      }
+      finally {
+        ThreadingAssertions.setImplicitLockOnEDT(prevImplicitLock)
+      }
       return true
     }
     else {
@@ -287,6 +314,8 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
       if (!ts.hasPermit) {
         return false
       }
+      val prevImplicitLock = ThreadingAssertions.isImplicitLockOnEDT()
+      ThreadingAssertions.setImplicitLockOnEDT(false)
       try {
         fireReadActionStarted(action.javaClass)
         action.run()
@@ -294,6 +323,7 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
         return true
       }
       finally {
+        ThreadingAssertions.setImplicitLockOnEDT(prevImplicitLock)
         ts.release()
         fireAfterReadActionFinished(action.javaClass)
       }
@@ -492,6 +522,8 @@ internal object AnyThreadWriteThreadingSupport: ThreadingSupport {
   }
 
   override fun isInImpatientReader(): Boolean = myState.get().impatientReader
+
+  override fun isInsideUnlockedWriteIntentLock(): Boolean = myState.get().writeIntentReleased
 
   private fun measureWriteLock(acquisitor: () -> WritePermit) : WritePermit {
     val delay = ApplicationImpl.Holder.ourDumpThreadsOnLongWriteActionWaiting

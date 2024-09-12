@@ -22,10 +22,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.MnemonicHelper
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.AnActionListener
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.asContextElement
+import com.intellij.openapi.application.*
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
@@ -77,6 +74,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import org.intellij.lang.annotations.MagicConstant
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.ApiStatus.Internal
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.annotations.VisibleForTesting
 import java.awt.*
@@ -118,10 +116,10 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
   private val sideStack = SideStack()
   private val toolWindowPanes = LinkedHashMap<String, ToolWindowPane>()
 
-  private var frameHelper: ProjectFrameHelper?
-    get() = state.frame
+  private var projectFrame: JFrame?
+    get() = state.projectFrame
     set(value) {
-      state.frame = value
+      state.projectFrame = value
     }
 
   override var layoutToRestoreLater: DesktopLayout?
@@ -498,39 +496,39 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     }
   }
 
-  suspend fun init(
-    frameHelperDeferred: Deferred<ProjectFrameHelper>,
+  internal suspend fun init(
+    pane: ToolWindowPane,
     reopeningEditorJob: Job,
-    taskListDeferred: Deferred<List<RegisterToolWindowTask>>,
+    taskListDeferred: Deferred<List<RegisterToolWindowTaskData>>,
   ) {
-    doInit(frameHelperDeferred = frameHelperDeferred,
+    doInit(pane = pane,
            connection = project.messageBus.connect(coroutineScope),
            reopeningEditorJob = reopeningEditorJob,
-           taskListDeferred = taskListDeferred)
+           taskListDeferred = taskListDeferred
+    )
   }
 
+  @Internal
   @VisibleForTesting
   suspend fun doInit(
-    frameHelperDeferred: Deferred<ProjectFrameHelper>,
+    pane: ToolWindowPane,
     connection: SimpleMessageBusConnection,
     reopeningEditorJob: Job,
-    taskListDeferred: Deferred<List<RegisterToolWindowTask>>?,
+    taskListDeferred: Deferred<List<RegisterToolWindowTaskData>>?,
   ) {
     withContext(ModalityState.any().asContextElement()) {
-      val frameHelper = frameHelperDeferred.await()
       launch(Dispatchers.EDT) {
-        this@ToolWindowManagerImpl.frameHelper = frameHelper
+        this@ToolWindowManagerImpl.projectFrame = pane.frame
 
         // Make sure we haven't already created the root tool window pane.
         // We might have created panes for secondary frames, as they get
         // registered differently, but we shouldn't have the main pane yet
         LOG.assertTrue(!toolWindowPanes.containsKey(WINDOW_INFO_DEFAULT_TOOL_WINDOW_PANE_ID))
 
-        val toolWindowPane = frameHelper.rootPane.getToolWindowPane()
         // This will be the tool window pane for the default frame, which is not automatically added by the ToolWindowPane constructor.
         // If we're reopening other frames, their tool window panes will be added,
         // but we still need to initialise the tool windows themselves.
-        toolWindowPanes.put(toolWindowPane.paneId, toolWindowPane)
+        toolWindowPanes.put(pane.paneId, pane)
       }
       connection.subscribe(ToolWindowManagerListener.TOPIC, dispatcher.multicaster)
       toolWindowSetInitializer.initUi(reopeningEditorJob, taskListDeferred)
@@ -571,7 +569,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     withContext(Dispatchers.EDT) {
       // always add to the default tool window pane
       @Suppress("DEPRECATION")
-      val task = RegisterToolWindowTask(
+      val task = RegisterToolWindowTaskData(
         id = bean.id,
         icon = findIconFromBean(bean, factory, plugin),
         anchor = getToolWindowAnchor(factory, bean),
@@ -579,10 +577,9 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
         canCloseContent = bean.canCloseContents,
         shouldBeAvailable = factory.shouldBeAvailable(project),
         contentFactory = factory,
-        stripeTitle = getStripeTitleSupplier(id = bean.id, project = project, pluginDescriptor = plugin)
-      ).apply {
-        pluginDescriptor = plugin
-      }
+        stripeTitle = getStripeTitleSupplier(id = bean.id, project = project, pluginDescriptor = plugin),
+        pluginDescriptor = plugin,
+      )
 
       val toolWindowPane = getDefaultToolWindowPaneIfInitialized()
       registerToolWindow(task, toolWindowPane.buttonManager)
@@ -646,8 +643,11 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
                        source = source)
 
     coroutineScope.launch(Dispatchers.EDT) {
-      runnable?.run()
-      UiActivityMonitor.getInstance().removeActivity(project, activity)
+      //maybe readaction
+      writeIntentReadAction {
+        runnable?.run()
+        UiActivityMonitor.getInstance().removeActivity(project, activity)
+      }
     }
   }
 
@@ -779,7 +779,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
 
   override val activeToolWindowId: String?
     get() {
-      val frame = toolWindowPanes.values.firstOrNull { it.frame.isActive }?.frame ?: frameHelper?.frame ?: return null
+      val frame = toolWindowPanes.values.firstOrNull { it.frame.isActive }?.frame ?: projectFrame ?: return null
       if (frame.isActive) {
         return getToolWindowIdForComponent(frame.mostRecentFocusOwner)
       }
@@ -1068,7 +1068,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     // try to get a previously saved tool window pane, if possible
     val toolWindowPane = layoutState.getInfo(task.id)?.toolWindowPaneId?.let { getToolWindowPane(it) }
                          ?: getDefaultToolWindowPaneIfInitialized()
-    val entry = registerToolWindow(task, buttonManager = toolWindowPane.buttonManager)
+    val entry = registerToolWindow(task.data, buttonManager = toolWindowPane.buttonManager)
     project.messageBus.syncPublisher(ToolWindowManagerListener.TOPIC).toolWindowsRegistered(listOf(entry.id), this)
 
     toolWindowPane.buttonManager.getStripeFor(entry.toolWindow.anchor, entry.toolWindow.isSplitMode).revalidate()
@@ -1079,7 +1079,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     return entry.toolWindow
   }
 
-  internal fun registerToolWindow(task: RegisterToolWindowTask, buttonManager: ToolWindowButtonManager): ToolWindowEntry {
+  internal fun registerToolWindow(task: RegisterToolWindowTaskData, buttonManager: ToolWindowButtonManager): ToolWindowEntry {
     val layout = layoutState
     val existingInfo = layout.getInfo(task.id)
     val preparedTask = PreparedRegisterToolWindowTask(
@@ -1174,7 +1174,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     }
 
     val stripeButton = if (preparedTask.isButtonNeeded) {
-      buttonManager.createStripeButton(toolWindow = toolWindow, info = infoSnapshot, task = task)
+      buttonManager.createStripeButton(toolWindow = toolWindow, info = infoSnapshot, task = RegisterToolWindowTask(task))
     }
     else {
       LOG.debug {
@@ -1213,7 +1213,7 @@ open class ToolWindowManagerImpl @NonInjectable @TestOnly internal constructor(
     return RegisterToolWindowResult(entry = entry, postTask = null)
   }
 
-  internal fun isButtonNeeded(task: RegisterToolWindowTask, info: WindowInfoImpl?, stripeManager: ToolWindowStripeManager): Boolean {
+  internal fun isButtonNeeded(task: RegisterToolWindowTaskData, info: WindowInfoImpl?, stripeManager: ToolWindowStripeManager): Boolean {
     return (task.shouldBeAvailable
             && (info?.isShowStripeButton ?: !(isNewUi && isToolwindowOfBundledPlugin(task)))
             && stripeManager.allowToShowOnStripe(task.id, info == null, isNewUi))
@@ -2635,7 +2635,7 @@ private fun windowInfoChanges(oldInfo: WindowInfo, newInfo: WindowInfo): String 
   return sb.toString()
 }
 
-private fun isToolwindowOfBundledPlugin(task: RegisterToolWindowTask): Boolean {
+private fun isToolwindowOfBundledPlugin(task: RegisterToolWindowTaskData): Boolean {
   // platform toolwindow but registered dynamically
   if (ToolWindowId.BUILD_DEPENDENCIES == task.id) {
     return true

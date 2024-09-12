@@ -12,6 +12,7 @@ import com.intellij.openapi.observable.util.equalsTo
 import com.intellij.openapi.observable.util.notEqualsTo
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.validation.DialogValidationRequestor
 import com.intellij.openapi.ui.validation.WHEN_PROPERTY_CHANGED
 import com.intellij.openapi.ui.validation.and
@@ -35,6 +36,7 @@ import com.jetbrains.python.sdk.conda.CondaInstallManager
 import com.jetbrains.python.sdk.flavors.PythonSdkFlavor
 import com.jetbrains.python.sdk.flavors.conda.PyCondaEnv
 import com.jetbrains.python.sdk.flavors.conda.PyCondaEnvIdentity
+import com.jetbrains.python.util.ErrorSink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.SharedFlow
@@ -63,9 +65,11 @@ class PythonNewEnvironmentDialogNavigator {
   lateinit var newEnvManager: ObservableMutableProperty<PythonSupportedEnvironmentManagers>
   lateinit var existingEnvManager: ObservableMutableProperty<PythonSupportedEnvironmentManagers>
 
-  fun navigateTo(newMode: PythonInterpreterSelectionMode? = null,
-                 newMethod: PythonInterpreterSelectionMethod? = null,
-                 newManager: PythonSupportedEnvironmentManagers? = null) {
+  fun navigateTo(
+    newMode: PythonInterpreterSelectionMode? = null,
+    newMethod: PythonInterpreterSelectionMethod? = null,
+    newManager: PythonSupportedEnvironmentManagers? = null,
+  ) {
     newMode?.let { selectionMode?.set(it) }
     newMethod?.let { method ->
       selectionMethod.set(method)
@@ -106,12 +110,12 @@ class PythonNewEnvironmentDialogNavigator {
   /**
    * Loads all fields from storage ([selectionMode] is only loaded when included into `onlyAllowedSelectionModes`)
    */
-  internal fun restoreLastState(onlyAllowedSelectionModes: Collection<PythonInterpreterSelectionMode> = PythonInterpreterSelectionMode.entries.toSet()) {
+  internal fun restoreLastState(allowedInterpreterTypes: Collection<PythonInterpreterSelectionMode>) {
     val properties = PropertiesComponent.getInstance()
 
     val modeString = properties.getValue(FAV_MODE) ?: return
     val mode = PythonInterpreterSelectionMode.valueOf(modeString)
-    if (mode !in onlyAllowedSelectionModes) return
+    if (mode !in allowedInterpreterTypes) return
     selectionMode?.set(mode)
 
     if (mode == CUSTOM) {
@@ -148,8 +152,6 @@ internal fun SimpleColoredComponent.customizeForPythonInterpreter(interpreter: P
       append(interpreter.sdk.versionString!!)
       append(" " + interpreter.homePath, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
     }
-    is InterpreterSeparator -> return
-    else -> error("Unknown PythonSelectableInterpreter type")
   }
 }
 
@@ -157,7 +159,6 @@ internal fun SimpleColoredComponent.customizeForPythonInterpreter(interpreter: P
 class PythonSdkComboBoxListCellRenderer : ColoredListCellRenderer<Any>() {
 
   override fun getListCellRendererComponent(list: JList<out Any>?, value: Any?, index: Int, selected: Boolean, hasFocus: Boolean): Component {
-    if (value is InterpreterSeparator) return TitledSeparator(value.text).apply { setLabelFocusable(false) }
     return super.getListCellRendererComponent(list, value, index, selected, hasFocus)
   }
 
@@ -194,9 +195,11 @@ class PythonEnvironmentComboBoxRenderer : ColoredListCellRenderer<Any>() {
   }
 }
 
-internal fun Row.pythonInterpreterComboBox(selectedSdkProperty: ObservableMutableProperty<PythonSelectableInterpreter?>, // todo not sdk
-                                           model: PythonAddInterpreterModel,
-                                           onPathSelected: (String) -> Unit, busyState: StateFlow<Boolean>? = null): Cell<PythonInterpreterComboBox> {
+internal fun Row.pythonInterpreterComboBox(
+  selectedSdkProperty: ObservableMutableProperty<PythonSelectableInterpreter?>, // todo not sdk
+  model: PythonAddInterpreterModel,
+  onPathSelected: (String) -> Unit, busyState: StateFlow<Boolean>? = null,
+): Cell<PythonInterpreterComboBox> {
 
   val comboBox = PythonInterpreterComboBox(selectedSdkProperty, model, onPathSelected)
   val cell = cell(comboBox)
@@ -204,6 +207,11 @@ internal fun Row.pythonInterpreterComboBox(selectedSdkProperty: ObservableMutabl
     .applyToComponent {
       preferredHeight = 30
       isEditable = true
+    }.validationOnApply {
+      if (comboBox.isBusy) {
+        ValidationInfo(message("python.add.sdk.panel.wait"))
+      }
+      else null
     }
 
   model.scope.launch(model.uiContext, start = CoroutineStart.UNDISPATCHED) {
@@ -221,9 +229,11 @@ internal fun Row.pythonInterpreterComboBox(selectedSdkProperty: ObservableMutabl
 
 }
 
-class PythonInterpreterComboBox(val backingProperty: ObservableMutableProperty<PythonSelectableInterpreter?>,
-                                val controller: PythonAddInterpreterModel,
-                                val onPathSelected: (String) -> Unit) : ComboBox<PythonSelectableInterpreter?>() {
+class PythonInterpreterComboBox(
+  val backingProperty: ObservableMutableProperty<PythonSelectableInterpreter?>,
+  val controller: PythonAddInterpreterModel,
+  val onPathSelected: (String) -> Unit,
+) : ComboBox<PythonSelectableInterpreter?>() {
 
   private lateinit var itemsFlow: StateFlow<List<PythonSelectableInterpreter>>
   val items: List<PythonSelectableInterpreter>
@@ -281,9 +291,13 @@ class PythonInterpreterComboBox(val backingProperty: ObservableMutableProperty<P
     }
   }
 
+  // Both these methods are abstraction leakage and should be rewritten
+
   fun setBusy(busy: Boolean) {
     (editor as PythonSdkComboBoxWithBrowseButtonEditor).setBusy(busy)
   }
+
+  val isBusy: Boolean get() = (editor as PythonSdkComboBoxWithBrowseButtonEditor).isBusy
 }
 
 /**
@@ -296,10 +310,12 @@ class PythonInterpreterComboBox(val backingProperty: ObservableMutableProperty<P
  * @param makeTemporaryEditable if the property is set then [this] ComboBox is made temporary editable while displaying
  *                              animated loader icon
  */
-private fun ComboBox<*>.displayLoaderWhen(loading: SharedFlow<Boolean>,
-                                          makeTemporaryEditable: Boolean = false,
-                                          scope: CoroutineScope,
-                                          uiContext: CoroutineContext) {
+private fun ComboBox<*>.displayLoaderWhen(
+  loading: SharedFlow<Boolean>,
+  makeTemporaryEditable: Boolean = false,
+  scope: CoroutineScope,
+  uiContext: CoroutineContext,
+) {
   scope.launch(start = CoroutineStart.UNDISPATCHED) {
     loading.collectLatest { currentValue ->
       withContext(uiContext) {
@@ -309,15 +325,19 @@ private fun ComboBox<*>.displayLoaderWhen(loading: SharedFlow<Boolean>,
   }
 }
 
-internal fun <T : TextFieldWithBrowseButton> Cell<T>.displayLoaderWhen(loading: StateFlow<Boolean>,
-                                                                       scope: CoroutineScope,
-                                                                       uiContext: CoroutineContext): Cell<T> =
+internal fun <T : TextFieldWithBrowseButton> Cell<T>.displayLoaderWhen(
+  loading: StateFlow<Boolean>,
+  scope: CoroutineScope,
+  uiContext: CoroutineContext,
+): Cell<T> =
   applyToComponent { displayLoaderWhen(loading, scope, uiContext) }
 
-internal fun <T, C : ComboBox<T>> Cell<C>.displayLoaderWhen(loading: SharedFlow<Boolean>,
-                                                            makeTemporaryEditable: Boolean = false,
-                                                            scope: CoroutineScope,
-                                                            uiContext: CoroutineContext): Cell<C> =
+internal fun <T, C : ComboBox<T>> Cell<C>.displayLoaderWhen(
+  loading: SharedFlow<Boolean>,
+  makeTemporaryEditable: Boolean = false,
+  scope: CoroutineScope,
+  uiContext: CoroutineContext,
+): Cell<C> =
   applyToComponent {
     if (makeTemporaryEditable && editor.editorComponent !is ExtendableTextField) {
       editor = object : BasicComboBoxEditor() {
@@ -375,11 +395,13 @@ private fun ExtendableTextComponent.removeLoadingExtension() {
 
 const val UNKNOWN_EXECUTABLE = "<unknown_executable>"
 
-fun Panel.executableSelector(executable: ObservableMutableProperty<String>,
-                             validationRequestor: DialogValidationRequestor,
-                             labelText: @Nls String,
-                             missingExecutableText: @Nls String,
-                             installAction: ActionLink? = null): Cell<TextFieldWithBrowseButton> {
+fun Panel.executableSelector(
+  executable: ObservableMutableProperty<String>,
+  validationRequestor: DialogValidationRequestor,
+  labelText: @Nls String,
+  missingExecutableText: @Nls String,
+  installAction: ActionLink? = null,
+): Cell<TextFieldWithBrowseButton> {
   var textFieldCell: Cell<TextFieldWithBrowseButton>? = null
   var validationPanel: JPanel? = null
 
@@ -399,7 +421,7 @@ fun Panel.executableSelector(executable: ObservableMutableProperty<String>,
                                         inline = true)
       .align(Align.FILL)
       .component
-  }.visibleIf(executable.equalsTo(UNKNOWN_EXECUTABLE))
+  }.visibleIf(executable.equalsTo(UNKNOWN_EXECUTABLE)).visibleIf(executable.equalsTo(""))
 
   row(labelText) {
     textFieldCell = textFieldWithBrowseButton()
@@ -426,14 +448,14 @@ fun Panel.executableSelector(executable: ObservableMutableProperty<String>,
   return textFieldCell!!
 }
 
-internal fun createInstallCondaFix(model: PythonAddInterpreterModel): ActionLink {
-  return ActionLink(message("sdk.create.conda.install.fix")) {
+internal fun createInstallCondaFix(model: PythonAddInterpreterModel, errorSink: ErrorSink): ActionLink {
+  return ActionLink(message("sdk.create.custom.venv.install.fix.title", "Miniconda", "")) {
     PythonSdkFlavor.clearExecutablesCache()
     CondaInstallManager.installLatest(null)
     model.scope.launch(model.uiContext) {
       model.condaEnvironmentsLoading.value = true
       model.detectCondaExecutable()
-      model.detectCondaEnvironments()
+      model.detectCondaEnvironmentsOrError(errorSink)
       model.condaEnvironmentsLoading.value = false
     }
   }

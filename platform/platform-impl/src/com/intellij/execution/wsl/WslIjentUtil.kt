@@ -12,8 +12,9 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.platform.eel.EelExecApi
+import com.intellij.platform.eel.EelExecApi.Arguments.executeProcessBuilder
 import com.intellij.platform.ijent.IjentChildProcess
-import com.intellij.platform.ijent.IjentExecApi
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import com.intellij.util.suspendingLazy
@@ -117,7 +118,7 @@ fun runProcessBlocking(
   val exePath = FileUtil.toSystemIndependentName(args.removeFirst())
 
   val pty = ptyOptions?.run {
-    IjentExecApi.Pty(initialColumns, initialRows, !consoleMode)
+    EelExecApi.Pty(initialColumns, initialRows, !consoleMode)
   }
 
   val workingDirectory = processBuilder.directory()?.toPath()?.let { windowsWorkingDirectory ->
@@ -129,20 +130,19 @@ fun runProcessBlocking(
   }
 
   val scope = @OptIn(DelicateCoroutinesApi::class) (wslIjentManager.processAdapterScope)
-  when (val processResult = ijentApi.exec.executeProcessBuilder(exePath)
+  when (val processResult = ijentApi.exec.execute(executeProcessBuilder(exePath)
     .args(args)
     .env(explicitEnvironmentVariables)
     .pty(pty)
     .workingDirectory(workingDirectory)
-    .execute()
-  ) {
-    is IjentExecApi.ExecuteProcessResult.Success ->
-      processResult.process.toProcess(
+  )) {
+    is EelExecApi.ExecuteProcessResult.Success ->
+      (processResult.process as IjentChildProcess).toProcess(
         coroutineScope = scope,
         isPty = pty != null,
         redirectStderr = processBuilder.redirectErrorStream(),
       )
-    is IjentExecApi.ExecuteProcessResult.Failure -> throw IOException(processResult.message)
+    is EelExecApi.ExecuteProcessResult.Failure -> throw IOException(processResult.message)
   }
 }
 

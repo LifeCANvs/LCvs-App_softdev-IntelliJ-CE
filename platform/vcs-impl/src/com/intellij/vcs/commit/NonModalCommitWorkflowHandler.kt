@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -422,7 +423,10 @@ abstract class NonModalCommitWorkflowHandler<W : NonModalCommitWorkflow, U : Non
         }
       }
 
-      FileDocumentManager.getInstance().saveAllDocuments()
+      //readaction is not enough
+      writeIntentReadAction {
+        FileDocumentManager.getInstance().saveAllDocuments()
+      }
       return@underChangelist null
     }
   }
@@ -434,7 +438,7 @@ abstract class NonModalCommitWorkflowHandler<W : NonModalCommitWorkflow, U : Non
           AbstractCommitWorkflow.runCommitCheck(project, commitCheck, commitInfo)
         } ?: continue
 
-        val solution = problem.showModalSolution(project, commitInfo)
+        val solution = writeIntentReadAction { problem.showModalSolution(project, commitInfo) }
         if (solution == CheckinHandler.ReturnResult.COMMIT) continue
 
         reportCommitCheckFailure(problem)

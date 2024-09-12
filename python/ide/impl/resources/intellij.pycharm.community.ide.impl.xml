@@ -103,8 +103,8 @@
     </action>
 
     <group id="WelcomeScreen.Platform.NewProject">
-      <action id="WelcomeScreen.CreateDirectoryProject"
-              class="com.intellij.pycharm.community.ide.impl.newProject.steps.PyCharmNewProjectStep"/>
+      <group id="WelcomeScreen.CreateDirectoryProject"
+              class="com.intellij.pycharm.community.ide.impl.newProject.impl.PyV3NewProjectStepAction"/>
       <reference ref="WelcomeScreen.OpenDirectoryProject"/>
 
       <add-to-group group-id="WelcomeScreen.QuickStart" anchor="first"/>

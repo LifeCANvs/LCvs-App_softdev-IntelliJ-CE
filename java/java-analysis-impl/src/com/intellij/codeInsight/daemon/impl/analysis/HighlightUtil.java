@@ -55,7 +55,7 @@ import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.*;
 import com.intellij.refactoring.util.RefactoringChangeUtil;
 import com.intellij.ui.ColorUtil;
-import com.intellij.ui.ExperimentalUI;
+import com.intellij.ui.NewUI;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.JavaPsiConstructorUtil;
@@ -215,15 +215,19 @@ public final class HighlightUtil {
         .formatType(checkType));
       HighlightInfo.Builder info =
         HighlightInfo.newHighlightInfo(HighlightInfoType.ERROR).range(expression).descriptionAndTooltip(message);
+      if (((operandIsPrimitive || checkIsPrimitive) && !primitiveInPatternsEnabled) && convertible) {
+        HighlightInfo.Builder infoFeature =
+          HighlightUtil.checkFeature(expression, JavaFeature.PRIMITIVE_TYPES_IN_PATTERNS,
+                                     PsiUtil.getLanguageLevel(expression), expression.getContainingFile());
+        if (infoFeature != null) {
+          info = infoFeature;
+        }
+      }
       if (checkIsPrimitive) {
         IntentionAction action = getFixFactory().createReplacePrimitiveWithBoxedTypeAction(operandType, typeElement);
         if (action != null) {
           info.registerFix(action, null, null, null, null);
         }
-      }
-
-      if (((operandIsPrimitive || checkIsPrimitive) && !primitiveInPatternsEnabled) && convertible) {
-        registerIncreaseLanguageLevelFixes(expression, JavaFeature.PRIMITIVE_TYPES_IN_PATTERNS, info);
       }
 
       errorSink.accept(info);
@@ -3025,7 +3029,8 @@ public final class HighlightUtil {
 
   static HighlightInfo.Builder checkUnclosedComment(@NotNull PsiComment comment) {
     if (!(comment instanceof PsiDocComment) && comment.getTokenType() != JavaTokenType.C_STYLE_COMMENT) return null;
-    if (!comment.getText().endsWith("*/")) {
+    String text = comment.getText();
+    if (text.startsWith("/*") && !text.endsWith("*/")) {
       int start = comment.getTextRange().getEndOffset() - 1;
       int end = start + 1;
       String description = JavaErrorBundle.message("unclosed.comment");
@@ -3443,7 +3448,7 @@ public final class HighlightUtil {
       typeText = type.getCanonicalText();
     }
     Color color = matches
-                  ? ExperimentalUI.isNewUI() ? JBUI.CurrentTheme.Editor.Tooltip.FOREGROUND : UIUtil.getToolTipForeground()
+                  ? NewUI.isEnabled() ? JBUI.CurrentTheme.Editor.Tooltip.FOREGROUND : UIUtil.getToolTipForeground()
                   : NamedColorUtil.getErrorForeground();
     return HtmlChunk.tag("font").attr("color", ColorUtil.toHtmlColor(color)).addText(typeText);
   }

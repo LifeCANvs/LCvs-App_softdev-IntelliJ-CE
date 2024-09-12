@@ -157,7 +157,7 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
   public void testWholeFileInspection() throws Exception {
     configureByFile(DaemonRespondToChangesTest.BASE_PATH + "FieldCanBeLocal.java");
     List<HighlightInfo> infos = doHighlighting(HighlightSeverity.WARNING);
-    assertEquals(1, infos.size());
+    assertSize(1, infos);
     assertEquals("Field can be converted to a local variable", infos.get(0).getDescription());
 
     ctrlW();
@@ -172,7 +172,7 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
     type("0");
 
     infos = doHighlighting(HighlightSeverity.WARNING);
-    assertEquals(1, infos.size());
+    assertSize(1, infos);
     assertEquals("Field can be converted to a local variable", infos.get(0).getDescription());
   }
 
@@ -423,7 +423,7 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
   private static final AtomicInteger toSleepMs = new AtomicInteger(0);
   private static final String SWEARING = "No swearing";
 
-  private void checkSwearingHighlightIsVisibleImmediately() {
+  private void checkSwearingHighlightIsVisibleImmediately() throws Exception {
     @Language("JAVA")
     String text = """
       class X /* */ {
@@ -474,7 +474,7 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
     }
   }
 
-  public void testAddInspectionProblemToProblemHolderEntailsCreatingCorrespondingRangeHighlighterMoreOrLessImmediately() {
+  public void testAddInspectionProblemToProblemHolderEntailsCreatingCorrespondingRangeHighlighterMoreOrLessImmediately() throws Exception {
     registerInspection(new MySwearingInspection());
     checkSwearingHighlightIsVisibleImmediately();
   }
@@ -826,7 +826,6 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
           @Override
           public void visitElement(@NotNull PsiElement element) {
             //System.out.println("fast visit "+element + Thread.currentThread());
-            super.visitElement(element);
           }
         };
       }
@@ -935,7 +934,7 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
       """;
     configureByText(JavaFileType.INSTANCE, text);
 
-    assertThrows(Exception.class, new MyException().getMessage(), () -> highlightErrors());
+    assertThrows(Throwable.class, new MyException().getMessage(), () -> highlightErrors());
   }
 
   public void testInspectionMustRemoveItsObsoleteHighlightsImmediatelyAfterVisitingPSIElementTheSecondTimeAndFailingToGenerateTheSameWarningAgain() {
@@ -968,7 +967,6 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
               }
               fieldIdentifierVisited.set(true);
             }
-            super.visitIdentifier(identifier);
           }
 
           @Override
@@ -1071,7 +1069,6 @@ public class DaemonInspectionsRespondToChangesTest extends DaemonAnalyzerTestCas
 
               holder.registerProblem(identifier, "XXX", ProblemHighlightType.WARNING);
             }
-            super.visitIdentifier(identifier);
           }
         };
       }

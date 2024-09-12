@@ -9,6 +9,7 @@ import com.intellij.driver.sdk.ui.Finder
 import com.intellij.driver.sdk.ui.remote.Component
 import com.intellij.driver.sdk.ui.remote.Window
 import com.intellij.driver.sdk.ui.ui
+import java.awt.Frame
 import javax.swing.JFrame
 
 fun Finder.ideFrame() = x(IdeaFrameUI::class.java) { byClass("IdeFrameImpl") }
@@ -62,8 +63,14 @@ open class IdeaFrameUI(data: ComponentData) : UiComponent(data) {
 
   fun openSettingsDialog() = driver.invokeAction("ShowSettings", now = false)
 
-  fun requestFocus() {
-    ideaFrameComponent.requestFocus()
+  fun toFront() {
+    ideaFrameComponent.toFront()
+  }
+
+  fun isMinimized() = ideaFrameComponent.getState() == Frame.ICONIFIED
+
+  fun unminimize() {
+    ideaFrameComponent.setState(Frame.NORMAL)
   }
 }
 
@@ -79,4 +86,6 @@ interface IdeFrameImpl : Window {
   fun getExtendedState(): Int
   fun setExtendedState(state: Int)
   fun setSize(width: Int, height: Int)
+  fun getState(): Int
+  fun setState(state: Int)
 }

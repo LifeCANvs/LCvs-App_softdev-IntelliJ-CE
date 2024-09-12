@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.shortenReferences
 import org.jetbrains.kotlin.idea.base.psi.isEffectivelyActual
-import org.jetbrains.kotlin.idea.base.psi.isExpectDeclaration
+import org.jetbrains.kotlin.psi.psiUtil.isExpectDeclaration
 import org.jetbrains.kotlin.idea.base.util.useScope
 import org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.usages.*
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.KotlinValVar
@@ -282,7 +282,7 @@ class KotlinChangeSignatureUsageProcessor : ChangeSignatureUsageProcessor {
         return true
     }
 
-    private fun updatePrimaryMethod(
+    fun updatePrimaryMethod(
         element: KtNamedDeclaration,
         changeInfo: KotlinChangeInfoBase,
         isInherited: Boolean = false,

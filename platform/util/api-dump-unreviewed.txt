@@ -41,6 +41,7 @@ f:com.intellij.Patches
 *:com.intellij.concurrency.IntelliJContextElement
 - kotlin.coroutines.CoroutineContext$Element
 - afterChildCompleted(kotlin.coroutines.CoroutineContext):V
+- beforeChildStarted(kotlin.coroutines.CoroutineContext):V
 - produceChildElement(kotlin.coroutines.CoroutineContext,Z):com.intellij.concurrency.IntelliJContextElement
 *f:com.intellij.concurrency.IntelliJContextElement$DefaultImpls
 - s:fold(com.intellij.concurrency.IntelliJContextElement,java.lang.Object,kotlin.jvm.functions.Function2):java.lang.Object
@@ -1100,8 +1101,14 @@ com.intellij.openapi.util.UserDataHolderEx
 - a:putUserDataIfAbsent(com.intellij.openapi.util.Key,java.lang.Object):java.lang.Object
 - a:replace(com.intellij.openapi.util.Key,java.lang.Object,java.lang.Object):Z
 f:com.intellij.openapi.util.UserDataHolderExKt
+- sf:getAndUpdateUserData(com.intellij.openapi.util.UserDataHolderEx,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function1):java.lang.Object
 - sf:getOrCreateUserData(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
+- sf:getOrCreateUserData(com.intellij.openapi.util.UserDataHolderEx,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
+- sf:getOrCreateUserDataUnsafe(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
+- sf:getOrMaybeCreateUserData(com.intellij.openapi.util.UserDataHolderEx,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
 - sf:nullableLazyValue(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
+- sf:nullableLazyValueUnsafe(com.intellij.openapi.util.UserDataHolder,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function0):java.lang.Object
+- sf:updateUserData(com.intellij.openapi.util.UserDataHolderEx,com.intellij.openapi.util.Key,kotlin.jvm.functions.Function1):java.lang.Object
 com.intellij.openapi.util.ValueKey
 - sf:Companion:com.intellij.openapi.util.ValueKey$Companion
 - a:getName():java.lang.String
@@ -1493,7 +1500,6 @@ c:com.intellij.openapi.util.registry.RegistryValue
 - f:getSelectedOption():java.lang.String
 - isBoolean():Z
 - isChangedFromDefault():Z
-- f:isChangedFromDefault(java.lang.String,com.intellij.openapi.util.registry.Registry):Z
 - f:isChangedSinceAppStart():Z
 - f:isMultiValue():Z
 - f:isOptionEnabled(java.lang.String):Z
@@ -4256,8 +4262,8 @@ com.intellij.util.indexing.InvertedIndex
 - a:dispose():V
 - a:flush():V
 - a:getData(java.lang.Object):com.intellij.util.indexing.ValueContainer
-- a:mapInputAndPrepareUpdate(I,java.lang.Object):com.intellij.openapi.util.Computable
-- a:prepareUpdate(I,com.intellij.util.indexing.impl.InputData):com.intellij.openapi.util.Computable
+- a:mapInputAndPrepareUpdate(I,java.lang.Object):com.intellij.util.indexing.StorageUpdate
+- a:prepareUpdate(I,com.intellij.util.indexing.impl.InputData):com.intellij.util.indexing.StorageUpdate
 f:com.intellij.util.indexing.InvertedIndexUtil
 - <init>():V
 - s:collectInputIdsContainingAllKeys(com.intellij.util.indexing.InvertedIndex,java.util.Collection,com.intellij.openapi.util.Condition,java.util.function.IntPredicate):it.unimi.dsi.fastutil.ints.IntSet
@@ -4267,6 +4273,10 @@ f:com.intellij.util.indexing.StorageException
 - <init>(java.lang.String):V
 - <init>(java.lang.String,java.lang.Throwable):V
 - <init>(java.lang.Throwable):V
+com.intellij.util.indexing.StorageUpdate
+- sf:NOOP:com.intellij.util.indexing.StorageUpdate
+- s:combine(com.intellij.util.indexing.StorageUpdate[]):com.intellij.util.indexing.StorageUpdate
+- a:update():Z
 a:com.intellij.util.indexing.ValueContainer
 - <init>():V
 - f:forEach(com.intellij.util.indexing.ValueContainer$ContainerAction):Z
@@ -4298,22 +4308,11 @@ com.intellij.util.indexing.containers.RandomAccessIntContainer
 - a:intIterator():com.intellij.util.indexing.containers.IntIdsIterator
 - a:remove(I):Z
 - a:size():I
-a:com.intellij.util.indexing.impl.AbstractUpdateData
-- p:<init>(I):V
-- getInputId():I
-- pa:iterateKeys(com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
-- p:updateForwardIndex():V
 f:com.intellij.util.indexing.impl.CollectionDataExternalizer
 - com.intellij.util.io.DataExternalizer
 - <init>(com.intellij.util.io.DataExternalizer):V
 - read(java.io.DataInput):java.util.Collection
 - save(java.io.DataOutput,java.util.Collection):V
-f:com.intellij.util.indexing.impl.EmptyInputDataDiffBuilder
-- <init>(I):V
-- differentiate(java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
-- getKeys():java.util.Collection
-- s:processAllKeyValuesAsAdded(I,java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor):Z
-- s:processAllKeyValuesAsRemoved(I,java.util.Map,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
 com.intellij.util.indexing.impl.IndexStorage
 - java.io.Closeable
 - java.io.Flushable
@@ -4338,21 +4337,10 @@ f:com.intellij.util.indexing.impl.InputIndexDataExternalizer
 - <init>(com.intellij.util.io.KeyDescriptor,com.intellij.util.indexing.IndexId):V
 - read(java.io.DataInput):java.util.Collection
 - save(java.io.DataOutput,java.util.Collection):V
-com.intellij.util.indexing.impl.KeyValueUpdateProcessor
-- a:process(java.lang.Object,java.lang.Object,I):V
-c:com.intellij.util.indexing.impl.MapInputDataDiffBuilder
-- <init>(I,java.util.Map):V
-- differentiate(java.util.Map,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.KeyValueUpdateProcessor,com.intellij.util.indexing.impl.RemovedKeyProcessor):Z
-- getKeys():java.util.Collection
 *f:com.intellij.util.indexing.impl.MapReduceIndexMappingException
 - java.lang.RuntimeException
 - <init>(java.lang.Throwable,java.lang.Class):V
 - getClassToBlame():java.lang.Class
-com.intellij.util.indexing.impl.RemovedKeyProcessor
-- a:process(java.lang.Object,I):V
-f:com.intellij.util.indexing.impl.UpdateData
-- com.intellij.util.indexing.impl.AbstractUpdateData
-- <init>(I,java.util.Map,com.intellij.openapi.util.ThrowableComputable,com.intellij.util.indexing.IndexId,com.intellij.util.ThrowableRunnable):V
 com.intellij.util.indexing.impl.ValueSerializationProblemReporter
 - a:reportProblem(java.lang.Exception):V
 com.intellij.util.indexing.impl.forward.ForwardIndex
@@ -5092,6 +5080,7 @@ f:com.intellij.util.io.URLUtil
 - sf:SCHEME_SEPARATOR:java.lang.String
 - sf:URL_PATTERN:java.util.regex.Pattern
 - sf:URL_WITH_PARENS_PATTERN:java.util.regex.Pattern
+- s:addSchemaIfMissing(java.lang.String):java.lang.String
 - s:canContainUrl(java.lang.String):Z
 - s:containsScheme(java.lang.String):Z
 - s:decode(java.lang.String):java.lang.String
@@ -5776,7 +5765,6 @@ a:com.intellij.util.ui.EdtInvocationManager
 - a:invokeLater(java.lang.Runnable):V
 - s:invokeLaterIfNeeded(java.lang.Runnable):V
 - f:isEventDispatchThread():Z
-- s:setEdtInvocationManager(com.intellij.util.ui.EdtInvocationManager):com.intellij.util.ui.EdtInvocationManager
 c:com.intellij.util.ui.EdtInvocationManager$SwingEdtInvocationManager
 - com.intellij.util.ui.EdtInvocationManager
 - <init>():V

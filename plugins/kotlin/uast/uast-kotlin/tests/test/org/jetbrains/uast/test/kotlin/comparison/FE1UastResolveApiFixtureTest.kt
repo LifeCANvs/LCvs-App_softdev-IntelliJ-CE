@@ -58,8 +58,12 @@ class FE1UastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
         checkMultiResolveJvmOverloads(myFixture)
     }
 
-    fun testLocalResolve() {
-        checkLocalResolve(myFixture)
+    fun testLocalResolve_class() {
+        checkLocalResolve_class(myFixture)
+    }
+
+    fun testLocalResolve_function() {
+        checkLocalResolve_function(myFixture)
     }
 
     fun testGetJavaClass() {
@@ -140,6 +144,10 @@ class FE1UastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
 
     fun testArgumentMappingSAM_methodReference() {
         checkArgumentMappingSAM_methodReference(myFixture)
+    }
+
+    fun testParameterForArgument_extensionReceiver_suspend() {
+        checkParameterForArgument_extensionReceiver_suspend(myFixture)
     }
 
     fun testSyntheticEnumMethods() {
@@ -276,5 +284,9 @@ class FE1UastResolveApiFixtureTest : KotlinLightCodeInsightFixtureTestCase(), Ua
 
     fun testResolveJvmNameOnSetterFromLibrary() {
         checkResolveJvmNameOnSetterFromLibrary(myFixture)
+    }
+
+    fun testResolveProtoDSL() {
+        checkResolveProtoDSL(myFixture, isK2 = false)
     }
 }

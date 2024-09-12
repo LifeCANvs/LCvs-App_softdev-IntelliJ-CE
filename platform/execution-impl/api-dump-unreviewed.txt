@@ -2998,9 +2998,7 @@ f:com.intellij.execution.ui.MacroComboBoxWithBrowseButton
 - com.intellij.ui.TextAccessor
 - <init>(com.intellij.openapi.fileChooser.FileChooserDescriptor,com.intellij.openapi.project.Project):V
 - getText():java.lang.String
-- setModule(com.intellij.openapi.module.Module):V
 - setText(java.lang.String):V
-- showModuleMacroAlways():V
 f:com.intellij.execution.ui.ProgramInputRedirectPanel
 - javax.swing.JPanel
 - com.intellij.ui.PanelWithAnchor
@@ -3358,7 +3356,6 @@ f:com.intellij.execution.ui.layout.impl.RunnerLayoutUiImpl
 - createContent(java.lang.String,javax.swing.JComponent,java.lang.String,javax.swing.Icon,javax.swing.JComponent):com.intellij.ui.content.Content
 - dispose():V
 - findContent(java.lang.String):com.intellij.ui.content.Content
-- getActions():java.util.List
 - getComponent():javax.swing.JComponent
 - getContentManager():com.intellij.ui.content.ContentManager
 - getContentUI():com.intellij.execution.ui.layout.impl.RunnerContentUi
@@ -3782,7 +3779,6 @@ c:com.intellij.terminal.JBTerminalWidget
 - dispose():V
 - p:executeCommand(java.lang.String):V
 - p:getComponentGraphics(java.awt.Graphics):java.awt.Graphics
-- getDefaultSessionName(com.jediterm.terminal.TtyConnector):java.lang.String
 - getFontSize():I
 - getFontSize2D():F
 - getListener():com.intellij.terminal.JBTerminalWidgetListener
@@ -3800,7 +3796,6 @@ c:com.intellij.terminal.JBTerminalWidget
 - setFontSize(I):V
 - setListener(com.intellij.terminal.JBTerminalWidgetListener):V
 - p:setShellCommand(java.util.List):V
-- setTtyConnector(com.jediterm.terminal.TtyConnector):V
 - start(com.jediterm.terminal.TtyConnector):V
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 - writePlainMessage(java.lang.String):V

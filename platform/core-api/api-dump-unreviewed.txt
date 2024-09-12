@@ -127,27 +127,15 @@ f:com.intellij.codeWithMe.ClientId
 - f:component1():java.lang.String
 - f:copy(java.lang.String):com.intellij.codeWithMe.ClientId
 - bs:copy$default(com.intellij.codeWithMe.ClientId,java.lang.String,I,java.lang.Object):com.intellij.codeWithMe.ClientId
-- sf:decorateBiConsumer(java.util.function.BiConsumer):java.util.function.BiConsumer
-- sf:decorateCallable(java.util.concurrent.Callable):java.util.concurrent.Callable
-- sf:decorateFunction(java.util.function.Function):java.util.function.Function
-- sf:decorateFunction(kotlin.jvm.functions.Function0):kotlin.jvm.functions.Function0
-- sf:decorateProcessor(com.intellij.util.Processor):com.intellij.util.Processor
-- sf:decorateRunnable(java.lang.Runnable):java.lang.Runnable
 - equals(java.lang.Object):Z
 - sf:getCurrent():com.intellij.codeWithMe.ClientId
 - sf:getCurrentOrNull():com.intellij.codeWithMe.ClientId
 - sf:getLocalId():com.intellij.codeWithMe.ClientId
 - sf:getOwnerId():com.intellij.codeWithMe.ClientId
-- sf:getPropagateAcrossThreads():Z
 - f:getValue():java.lang.String
 - hashCode():I
 - sf:isCurrentlyUnderLocalId():Z
 - sf:isLocal(com.intellij.codeWithMe.ClientId):Z
-- sf:overrideLocalId(com.intellij.codeWithMe.ClientId):V
-- sf:setPropagateAcrossThreads(Z):V
-- sf:withClientId(com.intellij.codeWithMe.ClientId):com.intellij.openapi.application.AccessToken
-- sf:withClientId(com.intellij.codeWithMe.ClientId,kotlin.jvm.functions.Function0):java.lang.Object
-- sf:withClientId(java.lang.String):com.intellij.openapi.application.AccessToken
 e:com.intellij.codeWithMe.ClientId$AbsenceBehavior
 - java.lang.Enum
 - sf:LOG_ERROR:com.intellij.codeWithMe.ClientId$AbsenceBehavior
@@ -156,32 +144,13 @@ e:com.intellij.codeWithMe.ClientId$AbsenceBehavior
 - s:valueOf(java.lang.String):com.intellij.codeWithMe.ClientId$AbsenceBehavior
 - s:values():com.intellij.codeWithMe.ClientId$AbsenceBehavior[]
 f:com.intellij.codeWithMe.ClientId$Companion
-- f:coroutineContext():kotlin.coroutines.CoroutineContext
-- f:decorateBiConsumer(java.util.function.BiConsumer):java.util.function.BiConsumer
-- f:decorateCallable(java.util.concurrent.Callable):java.util.concurrent.Callable
-- f:decorateFunction(java.util.function.Function):java.util.function.Function
-- f:decorateFunction(kotlin.jvm.functions.Function0):kotlin.jvm.functions.Function0
-- f:decorateProcessor(com.intellij.util.Processor):com.intellij.util.Processor
-- f:decorateRunnable(java.lang.Runnable):java.lang.Runnable
-- f:getAbsenceBehaviorValue():com.intellij.codeWithMe.ClientId$AbsenceBehavior
-- f:getClientIdLogger():com.intellij.openapi.diagnostic.Logger
 - f:getCurrent():com.intellij.codeWithMe.ClientId
 - f:getCurrentOrNull():com.intellij.codeWithMe.ClientId
 - f:getDefaultLocalId():com.intellij.codeWithMe.ClientId
 - f:getLocalId():com.intellij.codeWithMe.ClientId
 - f:getOwnerId():com.intellij.codeWithMe.ClientId
-- f:getPropagateAcrossThreads():Z
 - f:isCurrentlyUnderLocalId():Z
 - f:isLocal(com.intellij.codeWithMe.ClientId):Z
-- f:overrideLocalId(com.intellij.codeWithMe.ClientId):V
-- f:setPropagateAcrossThreads(Z):V
-- f:withClientId(com.intellij.codeWithMe.ClientId):com.intellij.openapi.application.AccessToken
-- f:withClientId(com.intellij.codeWithMe.ClientId,kotlin.jvm.functions.Function0):java.lang.Object
-- f:withClientId(java.lang.String):com.intellij.openapi.application.AccessToken
-f:com.intellij.codeWithMe.ClientId$Companion$ClientIdAccessToken
-- com.intellij.openapi.application.AccessToken
-- <init>(java.lang.String):V
-- finish():V
 f:com.intellij.codeWithMe.ClientIdExKt
 - sf:assertClientIdConsistency(com.intellij.codeWithMe.ClientId,java.lang.String):V
 - sf:isCurrent(com.intellij.codeWithMe.ClientId):Z
@@ -206,15 +175,6 @@ f:com.intellij.core.CoreBundle
 - sf:BUNDLE:java.lang.String
 - s:message(java.lang.String,java.lang.Object[]):java.lang.String
 - s:messageOrNull(java.lang.String,java.lang.Object[]):java.lang.String
-c:com.intellij.diagnostic.CompositeEventWatcher
-- com.intellij.openapi.Disposable
-- <init>(com.intellij.diagnostic.EventWatcher[]):V
-- dispose():V
-- edtEventFinished(java.awt.AWTEvent,J):V
-- edtEventStarted(java.awt.AWTEvent,J):V
-- logTimeMillis(java.lang.String,J,java.lang.Class):V
-- reset():V
-- runnableTaskFinished(java.lang.Runnable,J,I,J,Z):V
 com.intellij.diagnostic.Dumpable
 - a:dumpState():java.lang.String
 f:com.intellij.diagnostic.ImplementationConflictException
@@ -1430,16 +1390,19 @@ com.intellij.openapi.application.BaseExpirableExecutor
 - a:submit(java.util.concurrent.Callable):org.jetbrains.concurrency.CancellablePromise
 f:com.intellij.openapi.application.CoroutinesKt
 - bsf:asContextElement(com.intellij.openapi.application.ModalityState):kotlin.coroutines.CoroutineContext
+- *sf:backgroundWriteAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:constrainedReadAction(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:constrainedReadActionBlocking(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:constrainedReadAndWriteAction(com.intellij.openapi.application.ReadConstraint[],kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - sf:getEDT(kotlinx.coroutines.Dispatchers):kotlin.coroutines.CoroutineContext
+- *sf:isBackgroundWriteAction(kotlin.coroutines.CoroutineContext):Z
 - sf:readAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:readActionBlocking(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:readAndWriteAction(kotlin.jvm.functions.Function1,kotlin.coroutines.Continuation):java.lang.Object
 - sf:smartReadAction(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:smartReadActionBlocking(com.intellij.openapi.project.Project,kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - *sf:writeAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
+- *sf:writeIntentReadAction(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 com.intellij.openapi.application.DumbAwareSearchParameters
 - com.intellij.util.QueryParameters
 - a:getProject():com.intellij.openapi.project.Project
@@ -1630,10 +1593,14 @@ f:com.intellij.openapi.client.ClientSessionsUtil
 *f:com.intellij.openapi.client.ClientSystemInfo
 - *sf:Companion:com.intellij.openapi.client.ClientSystemInfo$Companion
 - f:getMacClient():java.lang.Boolean
+- f:getWindowsClient():java.lang.Boolean
 - sf:isMac():Z
+- sf:isWindows():Z
 - f:setMacClient(java.lang.Boolean):V
+- f:setWindowsClient(java.lang.Boolean):V
 *f:com.intellij.openapi.client.ClientSystemInfo$Companion
 - f:isMac():Z
+- f:isWindows():Z
 f:com.intellij.openapi.command.ActionsKt
 - sf:executeCommand(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,kotlin.jvm.functions.Function0):V
 - bs:executeCommand$default(com.intellij.openapi.project.Project,java.lang.String,java.lang.String,kotlin.jvm.functions.Function0,I,java.lang.Object):V
@@ -1743,16 +1710,6 @@ com.intellij.openapi.components.ApplicationComponent
 c:com.intellij.openapi.components.ApplicationComponent$Adapter
 - com.intellij.openapi.components.ApplicationComponent
 - <init>():V
-f:com.intellij.openapi.components.ComponentConfig
-- sf:EMPTY_ARRAY:com.intellij.openapi.components.ComponentConfig[]
-- f:headlessImplementationClass:java.lang.String
-- f:implementationClass:java.lang.String
-- f:interfaceClass:java.lang.String
-- loadForDefaultProject:Z
-- f:options:java.util.Map
-- f:os:com.intellij.openapi.extensions.ExtensionDescriptor$Os
-- overrides:Z
-- <init>(java.lang.String,java.lang.String,java.lang.String,Z,com.intellij.openapi.extensions.ExtensionDescriptor$Os,Z,java.util.Map):V
 com.intellij.openapi.components.ExportableApplicationComponent
 - com.intellij.openapi.components.ApplicationComponent
 - com.intellij.openapi.components.ExportableComponent
@@ -1795,16 +1752,6 @@ f:com.intellij.openapi.components.ServiceBean
 - getPluginDescriptor():com.intellij.openapi.extensions.PluginDescriptor
 - s:loadServicesFromBeans(com.intellij.openapi.extensions.ExtensionPointName,java.lang.Class):java.util.List
 - setPluginDescriptor(com.intellij.openapi.extensions.PluginDescriptor):V
-f:com.intellij.openapi.components.ServiceDescriptor
-- f:client:com.intellij.openapi.client.ClientKind
-- f:headlessImplementation:java.lang.String
-- f:os:com.intellij.openapi.extensions.ExtensionDescriptor$Os
-- f:overrides:Z
-- f:serviceImplementation:java.lang.String
-- f:serviceInterface:java.lang.String
-- f:testServiceImplementation:java.lang.String
-- <init>(java.lang.String,java.lang.String,java.lang.String,java.lang.String,Z,java.lang.String,com.intellij.openapi.components.ServiceDescriptor$PreloadMode,com.intellij.openapi.client.ClientKind,com.intellij.openapi.extensions.ExtensionDescriptor$Os):V
-- getImplementation():java.lang.String
 f:com.intellij.openapi.components.ServiceManager
 - s:createLazyKey(java.lang.Class):com.intellij.openapi.util.NotNullLazyKey
 - s:getService(com.intellij.openapi.project.Project,java.lang.Class):java.lang.Object
@@ -2341,6 +2288,7 @@ Ff:com.intellij.openapi.progress.CoroutineSuspender$DefaultImpls
 - sf:blockingContext(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:blockingContextScope(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:checkCanceled(kotlin.coroutines.Continuation):java.lang.Object
+- *sf:coroutineToIndicator(kotlin.jvm.functions.Function0,kotlin.coroutines.Continuation):java.lang.Object
 - sf:currentThreadCoroutineScope():kotlinx.coroutines.CoroutineScope
 - sf:runBlockingCancellable(kotlin.jvm.functions.Function2):java.lang.Object
 c:com.intellij.openapi.progress.DumbProgressIndicator
@@ -3508,12 +3456,10 @@ f:com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent
 - isValid():Z
 f:com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 - com.intellij.openapi.vfs.newvfs.events.VFileEvent
-- <init>(java.lang.Object,com.intellij.openapi.vfs.VirtualFile,java.lang.String,Z,com.intellij.openapi.util.io.FileAttributes,java.lang.String,Z,com.intellij.openapi.vfs.newvfs.events.ChildInfo[]):V
 - equals(java.lang.Object):Z
 - getAttributes():com.intellij.openapi.util.io.FileAttributes
 - getChildName():java.lang.String
 - getChildNameId():I
-- getChildren():com.intellij.openapi.vfs.newvfs.events.ChildInfo[]
 - getFile():com.intellij.openapi.vfs.VirtualFile
 - getFileSystem():com.intellij.openapi.vfs.VirtualFileSystem
 - getParent():com.intellij.openapi.vfs.VirtualFile
@@ -6298,6 +6244,8 @@ f:com.intellij.util.concurrency.ThreadingAssertions
 - s:assertReadAccess():V
 - s:assertWriteAccess():V
 - s:assertWriteIntentReadAccess():V
+- s:isImplicitLockOnEDT():Z
+- s:setImplicitLockOnEDT(Z):V
 - s:softAssertBackgroundThread():V
 - s:softAssertEventDispatchThread():V
 - s:softAssertReadAccess():V
@@ -6380,6 +6328,7 @@ a:com.intellij.util.messages.MessageBusFactory
 com.intellij.util.messages.MessageBusListener
 - a:getListener():java.lang.Object
 - a:getTopic():com.intellij.util.messages.Topic
+com.intellij.util.messages.MessageBusOwner
 f:com.intellij.util.messages.impl.MessageBusCoroutinesKt
 - sf:subscribeAsFlow(com.intellij.util.messages.MessageBus,com.intellij.util.messages.Topic,kotlin.jvm.functions.Function2):kotlinx.coroutines.flow.Flow
 f:com.intellij.util.messages.impl.MessageListenerList

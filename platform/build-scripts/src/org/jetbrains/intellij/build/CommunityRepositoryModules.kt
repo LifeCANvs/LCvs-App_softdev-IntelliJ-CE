@@ -3,7 +3,6 @@
 
 package org.jetbrains.intellij.build
 
-import com.intellij.platform.diagnostic.telemetry.helpers.useWithScope
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.intellij.build.impl.*
@@ -16,6 +15,8 @@ import org.jetbrains.intellij.build.io.copyDir
 import org.jetbrains.intellij.build.io.copyFileToDir
 import org.jetbrains.intellij.build.kotlin.KotlinPluginBuilder
 import org.jetbrains.intellij.build.python.PythonCommunityPluginModules
+import org.jetbrains.intellij.build.telemetry.TraceManager.spanBuilder
+import org.jetbrains.intellij.build.telemetry.use
 import org.jetbrains.jps.model.library.JpsOrderRootType
 import java.nio.file.Path
 import java.util.*
@@ -25,7 +26,9 @@ object CommunityRepositoryModules {
    * Specifies non-trivial layout for all plugins that sources are located in 'community' and 'contrib' repositories
    */
   val COMMUNITY_REPOSITORY_PLUGINS: PersistentList<PluginLayout> = persistentListOf(
-    pluginAuto("intellij.json") {},
+    pluginAuto("intellij.json") { spec ->
+      spec.withModule("intellij.json.split", "json-split.jar")
+    },
     pluginAuto("intellij.yaml") { spec ->
       spec.withModule("intellij.yaml.editing", "yaml-editing.jar")
     },
@@ -272,17 +275,18 @@ object CommunityRepositoryModules {
   }
 
   val supportedFfmpegPresets: PersistentList<SupportedDistribution> = persistentListOf(
-    // todo notarization
-    //SupportedDistribution(os = OsFamily.MACOS, arch = JvmArchitecture.x64),
-    //SupportedDistribution(os = OsFamily.MACOS, arch = JvmArchitecture.aarch64),
+    SupportedDistribution(os = OsFamily.MACOS, arch = JvmArchitecture.x64),
+    SupportedDistribution(os = OsFamily.MACOS, arch = JvmArchitecture.aarch64),
     SupportedDistribution(os = OsFamily.WINDOWS, arch = JvmArchitecture.x64),
     SupportedDistribution(os = OsFamily.LINUX, arch = JvmArchitecture.x64),
   )
 
-  private fun createAndroidPluginLayout(mainModuleName: String,
-                                        additionalModulesToJars: Map<String, String> = emptyMap(),
-                                        allPlatforms: Boolean,
-                                        addition: ((PluginLayout.PluginLayoutSpec) -> Unit)?): PluginLayout =
+  private fun createAndroidPluginLayout(
+    mainModuleName: String,
+    additionalModulesToJars: Map<String, String> = emptyMap(),
+    allPlatforms: Boolean,
+    addition: ((PluginLayout.PluginLayoutSpec) -> Unit)?,
+  ): PluginLayout =
     pluginAutoWithDeprecatedCustomDirName(mainModuleName) { spec ->
       spec.directoryName = "android"
       spec.mainJarName = "android.jar"
@@ -302,8 +306,7 @@ object CommunityRepositoryModules {
       // modules:
       // adt-ui.jar
       spec.withModule("intellij.android.adt.ui.compose", "adt-ui.jar")
-      spec.withModuleLibrary("jetbrains-jewel-int-ui-standalone", "intellij.android.adt.ui.compose", "jewel-int-ui-standalone.jar")
-      spec.withModuleLibrary("jetbrains-jewel-ide-laf-bridge", "intellij.android.adt.ui.compose", "jewel-ide-laf-bridge.jar")
+      spec.withModuleLibrary("jewel-markdown-ide-laf-bridge-styling-242", "intellij.android.adt.ui.compose", "jewel-markdown-ide-laf-bridge-styling-242.jar")
       spec.withModule("intellij.android.adt.ui.model", "adt-ui.jar")
       spec.withModule("intellij.android.adt.ui", "adt-ui.jar")
 
@@ -434,6 +437,7 @@ object CommunityRepositoryModules {
       //tools/adt/idea/whats-new-assistant:whats-new-assistant <= REMOVED
       spec.withModule("intellij.android.app-inspection.inspectors.network.ide", "android.jar")
       spec.withModule("intellij.android.app-inspection.inspectors.network.model", "android.jar")
+      spec.withModuleLibrary("brotli-dec", "intellij.android.app-inspection.inspectors.network.model", "android.jar")
       spec.withModule("intellij.android.app-inspection.inspectors.network.view", "android.jar")
       spec.withModule("intellij.android.server-flags", "android.jar")
       spec.withModule("intellij.android.codenavigation", "android.jar")
@@ -502,12 +506,6 @@ object CommunityRepositoryModules {
       // Add ffmpeg and javacpp
       spec.withModuleLibrary("ffmpeg", "intellij.android.streaming",  "ffmpeg-$ffmpegVersion.jar")
       spec.withModuleLibrary("ffmpeg-javacpp", "intellij.android.streaming", "javacpp-$javacppVersion.jar")
-
-      // todo notarization
-      spec.excludeModuleLibrary("ffmpeg-macos-aarch64", "intellij.android.streaming")
-      spec.excludeModuleLibrary("ffmpeg-macos-x64", "intellij.android.streaming")
-      spec.excludeModuleLibrary("javacpp-macos-aarch64", "intellij.android.streaming")
-      spec.excludeModuleLibrary("javacpp-macos-x64", "intellij.android.streaming")
 
       // include only required as platform-dependent binaries
       for ((supportedOs, supportedArch) in supportedFfmpegPresets) {
@@ -687,7 +685,7 @@ object CommunityRepositoryModules {
 
 private suspend fun copyAnt(pluginDir: Path, context: BuildContext): List<DistributionFileEntry> {
   val antDir = pluginDir.resolve("dist")
-  return TraceManager.spanBuilder("copy Ant lib").setAttribute("antDir", antDir.toString()).useWithScope {
+  return spanBuilder("copy Ant lib").setAttribute("antDir", antDir.toString()).use {
     val sources = ArrayList<ZipSource>()
     val libraryData = ProjectLibraryData(libraryName = "Ant", packMode = LibraryPackMode.MERGED, reason = "ant")
     copyDir(

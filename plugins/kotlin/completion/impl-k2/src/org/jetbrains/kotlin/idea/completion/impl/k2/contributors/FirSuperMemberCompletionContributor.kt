@@ -54,7 +54,7 @@ internal class FirSuperMemberCompletionContributor(
         sessionParameters: FirCompletionSessionParameters,
     ) = with(positionContext) {
         val superReceiver = positionContext.superExpression
-        val visibilityChecker = CompletionVisibilityChecker.create(basicContext, positionContext)
+        val visibilityChecker = CompletionVisibilityChecker(basicContext, positionContext)
         val superType = superReceiver.expressionType ?: return
 
         val (nonExtensionMembers: Iterable<CallableInfo>, namesNeedDisambiguation: Set<Name>) =
@@ -124,9 +124,9 @@ internal class FirSuperMemberCompletionContributor(
     ) {
         nonExtensionMembers.forEach { callableInfo ->
             addCallableSymbolToCompletion(
-                context,
-                callableInfo.signature,
-                CallableInsertionOptions(
+                context = context,
+                signature = callableInfo.signature,
+                options = CallableInsertionOptions(
                     importStrategyDetector.detectImportStrategyForCallableSymbol(callableInfo.signature.symbol),
                     wrapWithDisambiguationIfNeeded(
                         getInsertionStrategy(callableInfo.signature),
@@ -136,7 +136,8 @@ internal class FirSuperMemberCompletionContributor(
                         superReceiver
                     )
                 ),
-                CompletionSymbolOrigin.Scope(callableInfo.scopeKind),
+                symbolOrigin = CompletionSymbolOrigin.Scope(callableInfo.scopeKind),
+                withTrailingLambda = true,
             )
         }
     }

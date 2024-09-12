@@ -2,38 +2,41 @@
 package org.jetbrains.plugins.terminal.block.session
 
 import com.intellij.openapi.Disposable
-import com.intellij.util.Alarm
 import com.jediterm.terminal.TextStyle
+import com.jediterm.terminal.model.TerminalModelListener
 import com.jediterm.terminal.model.TerminalTextBuffer
 import org.jetbrains.plugins.terminal.TerminalUtil
+import org.jetbrains.plugins.terminal.block.session.TerminalModel.Companion.withLock
 import org.jetbrains.plugins.terminal.block.session.scraper.DropTrailingNewLinesStringCollector
 import org.jetbrains.plugins.terminal.block.session.scraper.SimpleStringCollector
 import org.jetbrains.plugins.terminal.block.session.scraper.StringCollector
 import org.jetbrains.plugins.terminal.block.session.scraper.StylesCollectingTerminalLinesCollector
 import org.jetbrains.plugins.terminal.block.session.scraper.CommandEndMarkerListeningStringCollector
 import org.jetbrains.plugins.terminal.block.session.scraper.TerminalLinesCollector
+import org.jetbrains.plugins.terminal.block.session.util.Debouncer
 import org.jetbrains.plugins.terminal.util.ShellType
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 internal class ShellCommandOutputScraperImpl(
-  private val session: BlockTerminalSession,
-  textBuffer: TerminalTextBuffer,
+  private val textBuffer: TerminalTextBuffer,
   parentDisposable: Disposable,
+  private val commandEndMarker: String?,
+  private val debounceTimeout: Int = 50,
 ) : ShellCommandOutputScraper {
 
-  constructor(session: BlockTerminalSession) : this(session, session.model.textBuffer, session)
+  constructor(session: BlockTerminalSession) : this(
+    session.model.textBuffer,
+    session as Disposable,
+    session.commandBlockIntegration.commandEndMarker
+  )
 
   private val listeners: MutableList<ShellCommandOutputListener> = CopyOnWriteArrayList()
-  private val contentChangedAlarm: Alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, parentDisposable)
-  private val scheduled: AtomicBoolean = AtomicBoolean(false)
 
-  @Volatile
-  private var useExtendedDelayOnce: Boolean = false
+  private val debouncer: Debouncer = Debouncer(debounceTimeout, parentDisposable)
 
   init {
-    TerminalUtil.addModelListener(textBuffer, parentDisposable) {
+    textBuffer.addModelListener(parentDisposable) {
       onContentChanged()
     }
   }
@@ -43,30 +46,26 @@ internal class ShellCommandOutputScraperImpl(
    */
   override fun addListener(listener: ShellCommandOutputListener, parentDisposable: Disposable, useExtendedDelayOnce: Boolean) {
     TerminalUtil.addItem(listeners, listener, parentDisposable)
-    this.useExtendedDelayOnce = useExtendedDelayOnce
+    this.debouncer.setExtendedDelayOnce()
   }
 
   private fun onContentChanged() {
     if (listeners.isNotEmpty()) {
-      if (scheduled.compareAndSet(false, true)) {
-        val request = {
-          scheduled.set(false)
-          if (listeners.isNotEmpty()) {
-            val output = scrapeOutput()
-            for (listener in listeners) {
-              listener.commandOutputChanged(output)
-            }
-          }
-        }
-        val delay = if (useExtendedDelayOnce) 150 else 50
-        useExtendedDelayOnce = false
-        contentChangedAlarm.addRequest(request, delay)
+      debouncer.execute(::doOnContentChanged)
+    }
+  }
+
+  private fun doOnContentChanged() {
+    if (listeners.isNotEmpty()) {
+      val output = scrapeOutput()
+      for (listener in listeners) {
+        listener.commandOutputChanged(output)
       }
     }
   }
 
-  override fun scrapeOutput(): StyledCommandOutput = session.model.withContentLock {
-    scrapeOutput(session.model.textBuffer, session.commandBlockIntegration.commandEndMarker)
+  override fun scrapeOutput(): StyledCommandOutput = textBuffer.withLock {
+    scrapeOutput(textBuffer, commandEndMarker)
   }
 
   companion object {
@@ -86,10 +85,7 @@ internal class ShellCommandOutputScraperImpl(
       val styles: MutableList<StyleRange> = mutableListOf()
       val styleCollectingOutputBuilder: TerminalLinesCollector = StylesCollectingTerminalLinesCollector(stringCollector, styles::add)
       val terminalLinesCollector: TerminalLinesCollector = styleCollectingOutputBuilder
-      if (!textBuffer.isUsingAlternateBuffer) {
-        terminalLinesCollector.addLines(textBuffer.historyBuffer)
-      }
-      terminalLinesCollector.addLines(textBuffer.screenBuffer)
+      textBuffer.collectLines(terminalLinesCollector)
       return StyledCommandOutput(stringCollector.buildText(), commandEndMarkerFound, styles)
     }
   }
@@ -163,4 +159,18 @@ private fun trimToLength(styleRange: StyleRange, newLength: Int): StyleRange? {
   }
 
   return StyleRange(styleRange.startOffset, newLength, styleRange.style)
+}
+
+internal fun TerminalTextBuffer.collectLines(
+  terminalLinesCollector: TerminalLinesCollector,
+) {
+  if (!isUsingAlternateBuffer) {
+    terminalLinesCollector.addLines(historyBuffer)
+  }
+  terminalLinesCollector.addLines(screenBuffer)
+  terminalLinesCollector.flush()
+}
+
+internal fun TerminalTextBuffer.addModelListener(parentDisposable: Disposable, listener: TerminalModelListener) {
+  TerminalUtil.addModelListener(this, parentDisposable, listener)
 }

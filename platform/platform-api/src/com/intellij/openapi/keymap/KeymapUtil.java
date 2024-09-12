@@ -53,7 +53,7 @@ public final class KeymapUtil {
     return ourDefaultKeymapTextContext.getShortcutText(shortcut);
   }
 
-  public static @NotNull String getMouseShortcutText(@NotNull MouseShortcut shortcut) {
+  public static @NotNull @NlsSafe String getMouseShortcutText(@NotNull MouseShortcut shortcut) {
     return ourDefaultKeymapTextContext.getMouseShortcutText(shortcut);
   }
 
@@ -285,6 +285,11 @@ public final class KeymapUtil {
       toolTipText += " (" + shortcutsText + ")";
     }
     return toolTipText;
+  }
+
+  /** @return text representation of the keymap modifiers, like Ctrl+Shift */
+  public static @NotNull String getModifiersText(@JdkConstants.InputEventMask int modifiers) {
+    return ourDefaultKeymapTextContext.getModifiersText(KeymapTextContext.mapNewModifiers(modifiers), false);
   }
 
   /**

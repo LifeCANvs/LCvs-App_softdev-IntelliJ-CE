@@ -1,6 +1,7 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.python.sdk.add.target
 
+import com.intellij.execution.target.TargetBrowserHints
 import com.intellij.execution.target.TargetEnvironmentConfiguration
 import com.intellij.execution.target.joinTargetPaths
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
@@ -19,10 +20,12 @@ import com.intellij.ui.layout.not
 import com.intellij.util.PathUtil
 import com.jetbrains.python.PyBundle
 import com.jetbrains.python.PySdkBundle
+import com.jetbrains.python.icons.PythonIcons
 import com.jetbrains.python.pathValidation.PlatformAndRoot.Companion.getPlatformAndRoot
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory
 import com.jetbrains.python.run.PythonInterpreterTargetEnvironmentFactory.Companion.extendWithTargetSpecificFields
 import com.jetbrains.python.sdk.*
+import com.jetbrains.python.sdk.VirtualEnvReader.Companion.DEFAULT_VIRTUALENVS_DIR
 import com.jetbrains.python.sdk.add.ExistingPySdkComboBoxItem
 import com.jetbrains.python.sdk.add.PySdkPathChoosingComboBox
 import com.jetbrains.python.sdk.add.addBaseInterpretersAsync
@@ -33,7 +36,6 @@ import com.jetbrains.python.sdk.flavors.PyFlavorAndData
 import com.jetbrains.python.sdk.flavors.PyFlavorData
 import com.jetbrains.python.target.PyTargetAwareAdditionalData
 import com.jetbrains.python.target.PythonLanguageRuntimeConfiguration
-import com.jetbrains.python.icons.PythonIcons
 import java.awt.BorderLayout
 import java.util.function.Supplier
 
@@ -97,8 +99,8 @@ class PyAddVirtualEnvPanel(
           else -> joinTargetPaths(config.userHome, DEFAULT_VIRTUALENVS_DIR, PathUtil.getFileName(projectBasePath), fileSeparator = '/')
         }
       }
-      addBrowseFolderListener(PySdkBundle.message("python.venv.location.chooser"), project, targetEnvironmentConfiguration,
-                              FileChooserDescriptorFactory.createSingleFolderDescriptor())
+      val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle(PySdkBundle.message("python.venv.location.chooser"))
+      addBrowseFolderListener(project, targetEnvironmentConfiguration, TargetBrowserHints(showLocalFsInBrowser = true, descriptor))
     }
     baseInterpreterCombobox = PySdkPathChoosingComboBox(targetEnvironmentConfiguration = targetEnvironmentConfiguration)
     contentPanel = panel {
@@ -226,15 +228,5 @@ class PyAddVirtualEnvPanel(
       val homePath = selectedSdk.homePath!!
       return createSdkForTarget(project, targetEnvironmentConfiguration, homePath, existingSdks, targetPanelExtension)
     }
-  }
-
-  companion object {
-    /**
-     * We assume this is the default name of the directory that is located in user home and which contains user virtualenv Python
-     * environments.
-     *
-     * @see com.jetbrains.python.sdk.flavors.VirtualEnvSdkFlavor.getDefaultLocation
-     */
-    const val DEFAULT_VIRTUALENVS_DIR = ".virtualenvs"
   }
 }

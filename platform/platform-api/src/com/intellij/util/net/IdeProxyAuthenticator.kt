@@ -4,6 +4,7 @@ package com.intellij.util.net
 import com.intellij.credentialStore.Credentials
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.util.SystemProperties
 import java.net.Authenticator
 import java.net.PasswordAuthentication
 
@@ -29,6 +30,8 @@ class IdeProxyAuthenticator(
    * 4. we now prompt the user for credentials in the first thread
    * 5. the second thread comes and should reuse the prompt result of the first thread. So it should react to the fact that the credentials
    *    that were used before are already known to be wrong, and there are other available => no need to prompt again
+   *
+   * NB: there is a JDK internal property: "http.auth.serializeRequests", see [sun.net.www.protocol.http.AuthenticationInfo.serializeAuth]
    */
   private val lastRequest = ThreadLocal<String>()
 
@@ -40,8 +43,14 @@ class IdeProxyAuthenticator(
     if (!isProxy) {
       return null
     }
-    val host = getHostNameReliably(requestingHost, requestingSite, requestingURL) ?: ""
+    val host = getHostNameReliably(requestingHost, requestingSite, requestingURL) ?: "" // TODO remove requestingURL, it is not relevant for proxy _auth_
     val port = requestingPort
+
+    if (RESTORE_OLD_BEHAVIOUR) { // FIXME see flag kdoc
+      // always return known credentials
+      return proxyAuth.getOrPromptAuthentication(requestingPrompt, host, port)?.toPasswordAuthentication()
+    }
+
     var credentials = proxyAuth.getOrPromptAuthentication(requestingPrompt, host, port)
     var key = getKey(credentials)
     if (lastRequest.get() == key) {
@@ -59,6 +68,17 @@ class IdeProxyAuthenticator(
 
   private companion object {
     private val logger = logger<IdeProxyAuthenticator>()
+
+    /**
+     * FIXME
+     * It turns out that the claim about JDK caching valid credentials is not precise ([lastRequest]). For some reason, in case
+     * NTLM or Kerberos auth schemes are used, JDK _may_ ask the authenticator again for credentials, even though the last credentials are
+     * still valid.
+     * Usually, it does so once for each request, and given that [lastRequest] checks for request equality, it usually works, meaning that we
+     * return known credentials to JDK and it suffices. But if we do two consecutive requests to the same URL, [lastRequest] value will match
+     * and we'll prompt the user to input credentials again. And this is bad.
+     */
+    private val RESTORE_OLD_BEHAVIOUR: Boolean = SystemProperties.getBooleanProperty("idea.proxy.auth.old.behaviour", true)
 
     private fun Credentials.toPasswordAuthentication(): PasswordAuthentication? {
       if (userName == null) return null

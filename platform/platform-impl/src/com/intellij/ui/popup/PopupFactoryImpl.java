@@ -261,7 +261,7 @@ public class PopupFactoryImpl extends JBPopupFactory {
                             @Nullable Runnable disposeCallback) {
       this(parentPopup,
            createStep(title, actionGroup, dataContext, actionPlace, presentationFactory, options),
-           disposeCallback, dataContext, options.maxRowCount);
+           disposeCallback, dataContext, options.getMaxRowCount());
       UiInspectorUtil.registerProvider(getList(), () -> UiInspectorActionUtil.collectActionGroupInfo(
         "Menu", actionGroup, actionPlace, ((ActionPopupStep)getStep()).getPresentationFactory()));
     }
@@ -344,7 +344,7 @@ public class PopupFactoryImpl extends JBPopupFactory {
       ActionPopupStep step = ObjectUtils.tryCast(getListStep(), ActionPopupStep.class);
       if (step != null && item != null && step.isSelectable(item) &&
           item.getKeepPopupOnPerform() != KeepPopupOnPerform.Never && item.getAction() instanceof ToggleAction toggle) {
-        AnActionEvent event = step.createAnActionEvent(toggle, keyEvent);
+        AnActionEvent event = step.createAnActionEvent(item, keyEvent);
         ActionUtil.performDumbAwareWithCallbacks(toggle, event, () -> {
           toggle.setSelected(event, isRightKey);
         });
@@ -950,7 +950,7 @@ public class PopupFactoryImpl extends JBPopupFactory {
       return icon;
     }
 
-    if (icon instanceof EmptyIcon) {
+    if (icon.getClass() == EmptyIcon.class) {
       return icon.getIconWidth() == maxIconWidth && icon.getIconHeight() == maxIconHeight
              ? icon
              : EmptyIcon.create(maxIconWidth, maxIconHeight);

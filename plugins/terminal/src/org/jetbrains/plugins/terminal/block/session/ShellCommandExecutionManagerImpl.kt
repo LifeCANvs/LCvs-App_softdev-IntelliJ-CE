@@ -3,9 +3,11 @@ package org.jetbrains.plugins.terminal.block.session
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.terminal.completion.spec.ShellCommandResult
+import com.intellij.util.EventDispatcher
 import com.intellij.util.containers.nullize
 import com.intellij.util.execution.ParametersListUtil
 import com.jediterm.core.input.InputEvent.CTRL_MASK
@@ -17,12 +19,17 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.jetbrains.plugins.terminal.TerminalUtil
 import org.jetbrains.plugins.terminal.block.session.ShellCommandManager.Companion.debug
+import org.jetbrains.plugins.terminal.block.util.ActionCoordinator
+import org.jetbrains.plugins.terminal.fus.TerminalUsageTriggerCollector
+import org.jetbrains.plugins.terminal.fus.TimeSpanType
+import org.jetbrains.plugins.terminal.util.ShellIntegration
 import org.jetbrains.plugins.terminal.util.ShellType
 import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.CancellationException
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * Prevents sending shell generator concurrently with other generator or other shell command.
@@ -30,9 +37,12 @@ import java.util.concurrent.atomic.AtomicInteger
 internal class ShellCommandExecutionManagerImpl(
   private val session: BlockTerminalSession,
   commandManager: ShellCommandManager,
+  private val shellIntegration: ShellIntegration,
+  private val terminal: Terminal,
+  private val parentDisposable: Disposable
 ) : ShellCommandExecutionManager {
 
-  private val listeners: CopyOnWriteArrayList<ShellCommandSentListener> = CopyOnWriteArrayList()
+  private val listeners: EventDispatcher<ShellCommandSentListener>  = EventDispatcher.create(ShellCommandSentListener::class.java)
 
   /**
    * Used to synchronize access to several private fields of this object.
@@ -69,6 +79,9 @@ internal class ShellCommandExecutionManagerImpl(
    */
   private var isCommandSent: Boolean = false
 
+  private val metricCommandSubmitToVisuallyStarted = createCommandMetric(shellIntegration.shellType, TimeSpanType.FROM_COMMAND_SUBMIT_TO_VISUALLY_STARTED)
+  private val metricCommandSubmitToActuallyStarted = createCommandMetric(shellIntegration.shellType, TimeSpanType.FROM_COMMAND_SUBMIT_TO_ACTUALLY_STARTED)
+
   init {
     commandManager.addListener(object : ShellCommandListener {
       override fun initialized() {
@@ -79,6 +92,7 @@ internal class ShellCommandExecutionManagerImpl(
       }
 
       override fun commandStarted(command: String) {
+        metricCommandSubmitToActuallyStarted.finished(command)
         lock.withLock {
           if (isCommandRunning) {
             LOG.warn("Received command_started event, but previous command wasn't finished")
@@ -122,7 +136,7 @@ internal class ShellCommandExecutionManagerImpl(
         }
         processQueueIfReady()
       }
-    }, session)
+    }, parentDisposable)
   }
 
   private fun cancelGenerators(registrar: Lock.AfterLockActionRegistrar, incompatibleCondition: String) {
@@ -149,6 +163,8 @@ internal class ShellCommandExecutionManagerImpl(
    * If the command could not be executed right now, then we add it to the queue.
    */
   override fun sendCommandToExecute(shellCommand: String) {
+    metricCommandSubmitToVisuallyStarted.started(shellCommand, TimeSource.Monotonic.markNow())
+    metricCommandSubmitToActuallyStarted.started(shellCommand, TimeSource.Monotonic.markNow())
     lock.withLock {
       if (isCommandSent || isCommandRunning) {
         LOG.info("Command '$shellCommand' is postponed until currently running command is finished")
@@ -175,10 +191,10 @@ internal class ShellCommandExecutionManagerImpl(
   }
 
   /**
-   * This is similar to sendCommandToExecute with the difference in termination signal.
-   * This sends "GENERATOR_FINISHED" instead of "Command finished" event.
+   * This is similar to [sendCommandToExecute] with the difference in finishing
+   * event (`generator_finished` instead of `command_finished`).
    *
-   * This does not execute command immediately, rather adds it to queue to be
+   * This does not execute the command immediately, rather adds it to the queue to be
    * executed when other commands\generators are finished and the shell is free.
    */
   override fun runGeneratorAsync(shellCommand: String): Deferred<ShellCommandResult> {
@@ -212,28 +228,25 @@ internal class ShellCommandExecutionManagerImpl(
 
       val keyBindings = scheduledKeyBindings.drainToList()
       if (keyBindings.isNotEmpty()) {
-        session.terminalStarterFuture.thenAccept { terminalStarter ->
-          terminalStarter ?: return@thenAccept
-          keyBindings.forEach { keyBinding ->
-            terminalStarter.sendBytes(keyBinding.bytes, false)
-          }
-          if (session.shellIntegration.shellType == ShellType.BASH ) { // reset prompt state to trigger all shell events.
-            val clearPrompt: String = createClearPromptShortcut(terminalStarter.terminal)
-            val enterCode = String(terminalStarter.terminal.getCodeForKey(KeyEvent.VK_ENTER, 0), StandardCharsets.UTF_8)
-            terminalStarter.sendString(clearPrompt + enterCode, false)
-          }
+        keyBindings.forEach { keyBinding ->
+          session.terminalOutputStream.sendBytes(keyBinding.bytes, false)
+        }
+        if (shellIntegration.shellType == ShellType.BASH ) { // reset prompt state to trigger all shell events.
+          val clearPrompt: String = createClearPromptShortcut(terminal)
+          val enterCode = String(terminal.getCodeForKey(KeyEvent.VK_ENTER, 0), StandardCharsets.UTF_8)
+          session.terminalOutputStream.sendString(clearPrompt + enterCode, false)
         }
       }
 
       scheduledCommands.poll()?.let { command ->
         cancelGenerators(registrar, "user command is ready to execute")
         isCommandSent = true
-        doSendCommandToExecute(command, false)
+        doSendCommandToExecute(command, false, registrar)
         return@withLock // `commandFinished` event will resume queue processing
       }
       pollNextGeneratorToRun()?.let {
         runningGenerator = it
-        doSendCommandToExecute(it.shellCommand(), true)
+        doSendCommandToExecute(it.shellCommand(), true, registrar)
         // `generatorFinished` event will resume queue processing
       }
     }
@@ -257,16 +270,25 @@ internal class ShellCommandExecutionManagerImpl(
     }
   }
 
-  private fun doSendCommandToExecute(shellCommand: String, isGenerator: Boolean) {
+  private fun doSendCommandToExecute(shellCommand: String, isGenerator: Boolean, registrar: Lock.AfterLockActionRegistrar) {
     session.terminalStarterFuture.thenAccept { starter ->
       starter ?: return@thenAccept
-      doSendCommandToExecute(starter, shellCommand, isGenerator)
+      doSendCommandToExecute(starter, shellCommand)
+      registrar.afterLock {
+        if (isGenerator) {
+          fireGeneratorCommandSent(shellCommand)
+        }
+        else {
+          metricCommandSubmitToVisuallyStarted.finished(shellCommand)
+          fireUserCommandSent(shellCommand)
+        }
+      }
     }
   }
 
-  private fun doSendCommandToExecute(starter: TerminalStarter, shellCommand: String, isGenerator: Boolean) {
+  private fun doSendCommandToExecute(starter: TerminalStarter, shellCommand: String) {
     var adjustedCommand = shellCommand
-    val enterCode = String(starter.terminal.getCodeForKey(KeyEvent.VK_ENTER, 0), StandardCharsets.UTF_8)
+    val enterCode = String(terminal.getCodeForKey(KeyEvent.VK_ENTER, 0), StandardCharsets.UTF_8)
     if (session.model.isBracketedPasteMode && (adjustedCommand.contains("\n") || adjustedCommand.contains(System.lineSeparator()))) {
       adjustedCommand = bracketed(adjustedCommand)
     }
@@ -274,41 +296,30 @@ internal class ShellCommandExecutionManagerImpl(
       // in the IDE we use '\n' line separator, but Windows requires '\r\n'
       adjustedCommand = adjustedCommand.replace("\n", enterCode)
     }
-    val clearPrompt = createClearPromptShortcut(starter.terminal)
+    val clearPrompt = createClearPromptShortcut(terminal)
     TerminalUtil.sendCommandToExecute(clearPrompt + adjustedCommand, starter)
-
-    if (isGenerator) {
-      fireGeneratorCommandSent(shellCommand)
-    }
-    else {
-      fireUserCommandSent(shellCommand)
-    }
   }
 
   override fun addListener(listener: ShellCommandSentListener) {
-    TerminalUtil.addItem(listeners, listener, session)
+    listeners.addListener(listener, parentDisposable)
   }
 
   override fun addListener(listener: ShellCommandSentListener, parentDisposable: Disposable) {
-    TerminalUtil.addItem(listeners, listener, parentDisposable)
+    listeners.addListener(listener, parentDisposable)
   }
 
   private fun fireUserCommandSent(userCommand: String) {
-    for (listener in listeners) {
-      listener.userCommandSent(userCommand)
-    }
+    listeners.multicaster.userCommandSent(userCommand)
     debug { "User command sent: $userCommand" }
   }
 
   private fun fireGeneratorCommandSent(generatorCommand: String) {
-    for (listener in listeners) {
-      listener.generatorCommandSent(generatorCommand)
-    }
+    listeners.multicaster.generatorCommandSent(generatorCommand)
     debug { "Generator command sent: $generatorCommand" }
   }
 
   private fun createClearPromptShortcut(terminal: Terminal): String {
-    return  when (session.shellIntegration.shellType) {
+    return  when (shellIntegration.shellType) {
       ShellType.POWERSHELL -> {
         // TODO SystemInfo will not work for SSH and WSL sessions.
         when {
@@ -340,7 +351,7 @@ internal class ShellCommandExecutionManagerImpl(
     val deferred: CompletableDeferred<ShellCommandResult> = CompletableDeferred()
 
     fun shellCommand(): String {
-      val escapedCommand = when (session.shellIntegration.shellType) {
+      val escapedCommand = when (shellIntegration.shellType) {
         ShellType.POWERSHELL -> StringUtil.wrapWithDoubleQuote(escapePowerShellParameter(shellCommand))
         else -> ParametersListUtil.escape(shellCommand)
       }
@@ -378,7 +389,7 @@ internal class ShellCommandExecutionManagerImpl(
   }
 
   companion object {
-    internal val LOG = logger<ShellCommandExecutionManagerImpl>()
+    private val LOG = logger<ShellCommandExecutionManagerImpl>()
     private val NEXT_REQUEST_ID = AtomicInteger(0)
     private const val GENERATOR_COMMAND = "__jetbrains_intellij_run_generator"
     private const val SHORTCUT_CTRL_U = "\u0015"
@@ -409,6 +420,27 @@ internal class ShellCommandExecutionManagerImpl(
     private fun bracketed(command: String): String {
       return "\u001b[200~$command\u001b[201~"
     }
+
+    private fun createCommandMetric(shellType: ShellType, type: TimeSpanType): ActionCoordinator<String, TimeMark> = ActionCoordinator<String, TimeMark>(
+      onActionComplete = { command, startTime ->
+        TerminalUsageTriggerCollector.logBlockTerminalTimeSpanFinished(
+          null,
+          shellType,
+          type,
+          startTime.elapsedNow()
+        )
+      },
+      onActionDiscarded = { command, startTime ->
+        TerminalUsageTriggerCollector.logBlockTerminalTimeSpanFinished(
+          null,
+          shellType,
+          type,
+          kotlin.time.Duration.INFINITE
+        )
+      },
+      onActionUnknown = { command ->
+        thisLogger().warn("Mismatched command $command")
+      }
+    )
   }
 }
-

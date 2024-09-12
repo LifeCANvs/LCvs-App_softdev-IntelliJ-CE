@@ -17,6 +17,7 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.serviceContainer.NonInjectable;
 import com.intellij.ui.breadcrumbs.BreadcrumbsProvider;
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
@@ -78,7 +79,6 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     public int CARET_BLINKING_PERIOD = BLINKING_RANGE.initial;
     public boolean IS_RIGHT_MARGIN_SHOWN = true;
     public boolean ARE_LINE_NUMBERS_SHOWN = true;
-    public boolean ARE_LINE_NUMBERS_AFTER_ICONS = false;
     public @NotNull EditorSettings.LineNumerationType LINE_NUMERATION = EditorSettings.LineNumerationType.ABSOLUTE;
     public boolean ARE_GUTTER_ICONS_SHOWN = true;
     public boolean IS_FOLDING_OUTLINE_SHOWN = true;
@@ -96,7 +96,7 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
 
     public boolean IS_BLOCK_CURSOR = false;
     public boolean IS_FULL_LINE_HEIGHT_CURSOR = false;
-    public boolean IS_HIGHLIGHT_SELECTION_OCCURRENCES = false;
+    public boolean IS_HIGHLIGHT_SELECTION_OCCURRENCES = true;
     public boolean IS_WHITESPACES_SHOWN = false;
     public boolean IS_LEADING_WHITESPACES_SHOWN = true;
     public boolean IS_INNER_WHITESPACES_SHOWN = true;
@@ -218,6 +218,7 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     myOsSpecificState = state;
   }
 
+  @RequiresBlockingContext
   public static EditorSettingsExternalizable getInstance() {
     return ApplicationManager.getApplication().getService(EditorSettingsExternalizable.class);
   }
@@ -309,10 +310,6 @@ public class EditorSettingsExternalizable implements PersistentStateComponent<Ed
     if (old == val) return;
     myOptions.ARE_LINE_NUMBERS_SHOWN = val;
     myPropertyChangeSupport.firePropertyChange(PropNames.PROP_ARE_LINE_NUMBERS_SHOWN, old, val);
-  }
-
-  public boolean isLineNumbersAfterIcons() {
-    return myOptions.ARE_LINE_NUMBERS_AFTER_ICONS;
   }
 
   public EditorSettings.LineNumerationType getLineNumeration() {

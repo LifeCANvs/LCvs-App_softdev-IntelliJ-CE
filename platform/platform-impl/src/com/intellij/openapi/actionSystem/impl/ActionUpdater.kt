@@ -21,6 +21,7 @@ import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.actionSystem.ex.InlineActionsHolder
 import com.intellij.openapi.application.Application
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.CeProcessCanceledException
@@ -51,7 +52,6 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
-import javax.swing.JComponent
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -78,8 +78,7 @@ internal class ActionUpdater @JvmOverloads constructor(
   private val presentationFactory: PresentationFactory,
   private val dataContext: DataContext,
   val place: String,
-  private val contextMenuAction: Boolean,
-  private val toolbarAction: Boolean,
+  private val uiKind: ActionUiKind,
   private val edtDispatcher: CoroutineDispatcher,
   private val actionFilter: ((AnAction) -> Boolean)? = null,
   private val eventTransform: ((AnActionEvent) -> AnActionEvent)? = null) {
@@ -110,16 +109,15 @@ internal class ActionUpdater @JvmOverloads constructor(
   fun applyPresentationChanges() {
     for ((action, copy) in updatedPresentations) {
       val orig = presentationFactory.getPresentation(action)
-      var customComponent: JComponent? = null
-      if (action is CustomComponentAction) {
-        // 1. toolbar may have already created a custom component, do not erase it
-        // 2. presentation factory may be just reset, do not reuse component from a copy
-        customComponent = orig.getClientProperty(CustomComponentAction.COMPONENT_KEY)
-      }
+      // 1. toolbar may have already created a custom component, do not erase it
+      // 2. presentation factory may be just reset, do not reuse component from a copy
+      var customComponent = orig.getClientProperty(CustomComponentAction.COMPONENT_KEY)
       presentationFactory.postProcessPresentation(action, copy)
       orig.copyFrom(copy, customComponent, true)
       if (customComponent != null && orig.isVisible) {
-        (action as CustomComponentAction).updateCustomComponent(customComponent, orig)
+        val componentProvider = action as? CustomComponentAction
+                                ?: copy.getClientProperty(ActionUtil.COMPONENT_PROVIDER)
+        componentProvider?.updateCustomComponent(customComponent, orig)
       }
     }
   }
@@ -230,14 +228,14 @@ internal class ActionUpdater @JvmOverloads constructor(
     edtCallsCount = 0
     edtWaitNanos = 0
     val job = currentCoroutineContext().job
-    val targetJobs = if (toolbarAction) ourToolbarJobs else ourOtherJobs
+    val targetJobs = if (uiKind is ActionUiKind.Toolbar) ourToolbarJobs else ourOtherJobs
     targetJobs.add(job)
     try {
       if (testDelayMillis > 0) {
         delay(testDelayMillis.toLong())
       }
       val result = ActionUpdaterInterceptor.expandActionGroup(
-        presentationFactory, dataContext, place, group, toolbarAction, asUpdateSession()) {
+        group, dataContext, place, uiKind, presentationFactory, asUpdateSession()) {
         removeUnnecessarySeparators(doExpandActionGroup(group, false))
       }
       computeOnEdt {
@@ -410,8 +408,7 @@ internal class ActionUpdater @JvmOverloads constructor(
   @Suppress("unused")
   private fun createActionEvent(element: OpElement, presentation: Presentation): AnActionEvent {
     val event = AnActionEvent(
-      null, dataContext, place, presentation,
-      actionManager, 0, contextMenuAction, toolbarAction).let {
+      dataContext, presentation, place, uiKind, null, 0, actionManager).let {
       eventTransform?.invoke(it) ?: it
     }
     event.updateSession = asUpdateSession()
@@ -427,7 +424,7 @@ internal class ActionUpdater @JvmOverloads constructor(
     val deferred = scope.async(
       currentCoroutineContext().minusKey(Job) +
       CoroutineName("computeOnEdt ($place)") + edtDispatcher) {
-      blockingContext {
+      writeIntentReadAction {
         supplier()
       }
     }

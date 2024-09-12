@@ -27,6 +27,7 @@ import com.intellij.util.concurrency.annotations.RequiresEdt;
 import com.jetbrains.python.PyBundle;
 import com.jetbrains.python.configuration.PyConfigurableInterpreterList;
 import com.jetbrains.python.newProject.PyFrameworkProjectGenerator;
+import com.jetbrains.python.newProject.PyNewProjectSettings;
 import com.jetbrains.python.newProject.PythonProjectGenerator;
 import com.jetbrains.python.newProject.collector.InterpreterStatisticsInfo;
 import com.jetbrains.python.packaging.PyPackage;
@@ -49,7 +50,11 @@ import java.util.List;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class ProjectSpecificSettingsStep<T> extends ProjectSettingsStepBase<T> implements DumbAware {
+/**
+ * @deprecated Use {@link com.jetbrains.python.newProjectWizard}
+ */
+@Deprecated
+public class ProjectSpecificSettingsStep<T extends PyNewProjectSettings> extends ProjectSettingsStepBase<T> implements DumbAware {
   private boolean myInstallFramework;
   private @Nullable PyAddSdkGroupPanel myInterpreterPanel;
   private @Nullable HideableDecorator myInterpretersDecorator;
@@ -149,7 +154,6 @@ public class ProjectSpecificSettingsStep<T> extends ProjectSettingsStepBase<T> i
     super.initGeneratorListeners();
     if (myProjectGenerator instanceof PythonProjectGenerator) {
       ((PythonProjectGenerator<?>)myProjectGenerator).addSettingsStateListener(this::checkValid);
-      myErrorLabel.addMouseListener(((PythonProjectGenerator<?>)myProjectGenerator).getErrorLabelMouseListener());
     }
   }
 
@@ -181,7 +185,7 @@ public class ProjectSpecificSettingsStep<T> extends ProjectSettingsStepBase<T> i
 
     if (validationErrors.isEmpty()) {
       // Once can't create anything on immutable SDK
-      var sdk = (interpreterPanel != null) ?  interpreterPanel.getSdk() : null;
+      var sdk = (interpreterPanel != null) ? interpreterPanel.getSdk() : null;
       if (sdk != null && isImmutableSdk(sdk)) {
         validationErrors = List.of(
           PyBundle.message("python.unknown.project.synchronizer.this.interpreter.type.does.not.support.remote.project.creation"));
@@ -308,7 +312,8 @@ public class ProjectSpecificSettingsStep<T> extends ProjectSettingsStepBase<T> i
     final Sdk preferredSdk = existingSdks.stream().findFirst().orElse(null);
 
     final String newProjectPath = getProjectLocation();
-    final PyAddNewEnvironmentPanel newEnvironmentPanel = new PyAddNewEnvironmentPanel(allExistingSdks, newProjectPath, preferredEnvironment);
+    final PyAddNewEnvironmentPanel newEnvironmentPanel =
+      new PyAddNewEnvironmentPanel(allExistingSdks, newProjectPath, preferredEnvironment);
     final PyAddExistingSdkPanel existingSdkPanel = new PyAddExistingSdkPanel(null, null, existingSdks, newProjectPath, preferredSdk);
 
     PyAddSdkPanel defaultPanel = PySdkSettings.getInstance().getUseNewEnvironmentForNewProject() ?

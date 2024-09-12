@@ -50,6 +50,7 @@ internal class DockWindow(
                  isDialog = isDialog,
                  coroutineScope = coroutineScope) {
   var northPanelAvailable: Boolean = false
+    private set
   private val northPanel = VerticalBox()
   private val northExtensions = LinkedHashMap<String, JComponent>()
   val uiContainer: NonOpaquePanel = NonOpaquePanel(BorderLayout())
@@ -108,7 +109,6 @@ internal class DockWindow(
     val buttonManager: ToolWindowButtonManager
     if (ExperimentalUI.isNewUI()) {
       buttonManager = ToolWindowPaneNewButtonManager(paneId, false)
-      buttonManager.add(dockContentUiContainer)
       buttonManager.initMoreButton(dockManager.project)
       buttonManager.updateResizeState(null)
     }
@@ -116,14 +116,15 @@ internal class DockWindow(
       buttonManager = ToolWindowPaneOldButtonManager(paneId)
     }
     val containerComponent = container.containerComponent
-    toolWindowPane = ToolWindowPane(frame = frame, coroutineScope = coroutineScope!!.childScope(), paneId = paneId,
-                                    buttonManager = buttonManager)
+    toolWindowPane = ToolWindowPane.create(frame = frame, coroutineScope = coroutineScope!!.childScope(), paneId = paneId,
+                                           buttonManager = buttonManager)
     val toolWindowManagerImpl = ToolWindowManager.getInstance(dockManager.project) as ToolWindowManagerImpl
     toolWindowManagerImpl.addToolWindowPane(toolWindowPane!!, this)
 
     toolWindowPane!!.setDocumentComponent(containerComponent)
     dockContentUiContainer.remove(containerComponent)
-    dockContentUiContainer.add(toolWindowPane!!, BorderLayout.CENTER)
+    val toolWindowsComponent = buttonManager.wrapWithControls(toolWindowPane!!)
+    dockContentUiContainer.add(toolWindowsComponent, BorderLayout.CENTER)
 
     // Close the container if it's empty, and we've just removed the last tool window
     dockManager.project.messageBus.connect(coroutineScope).subscribe(ToolWindowManagerListener.TOPIC, object : ToolWindowManagerListener {

@@ -7,6 +7,8 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.util.concurrency.ThreadingAssertions
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,9 +22,9 @@ private class MyService(val coroutineScope: CoroutineScope)
 /**
  * collects first item of flow in EDT and calls [consumer] to be used as an adapter.
  */
+@RequiresBlockingContext
 internal fun <T : Any> Flow<T>.oneShotConsumer(consumer: Consumer<T>) {
-
-  ApplicationManager.getApplication().service<MyService>().coroutineScope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+  ApplicationManager.getApplication().service<MyService>().coroutineScope.launch(Dispatchers.EDT + ModalityState.defaultModalityState().asContextElement()) {
     consumer.accept(this@oneShotConsumer.first())
   }
 }

@@ -46,8 +46,9 @@ internal suspend fun <T> Mutex.withReentrantLock(block: suspend () -> T): T {
   }
 }
 
-private class ReentrantMutexContextElement(override val key: ReentrantMutexContextKey) : CoroutineContext.Element, IntelliJContextElement {
-
+private class ReentrantMutexContextElement(
+  override val key: ReentrantMutexContextKey,
+) : CoroutineContext.Element, IntelliJContextElement {
   override fun produceChildElement(parentContext: CoroutineContext, isStructured: Boolean): IntelliJContextElement = this
 }
 

@@ -14,15 +14,11 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
-import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.NlsContexts.DialogMessage;
 import com.intellij.openapi.util.Pair;
-import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.DirectoryProjectGeneratorBase;
-import com.intellij.util.BooleanFunction;
-import com.intellij.util.PlatformUtils;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.python.PyBundle;
 import com.jetbrains.python.PyPsiPackageUtil;
@@ -43,7 +39,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.awt.event.MouseListener;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
@@ -53,40 +48,15 @@ import java.util.function.Consumer;
 
 
 /**
- * This class encapsulates remote settings, so one should extend it for any python project that supports remote generation, at least
- * Instead of {@link #generateProject(Project, VirtualFile, PyNewProjectSettings, Module)} inheritor shall use
- * {@link #configureProject(Project, VirtualFile, PyNewProjectSettings, Module, PyProjectSynchronizer)}*
- * or {@link #configureProjectNoSettings(Project, VirtualFile, Module)} (see difference below)
- * <br/>
- * If your project does not support remote projects generation, be sure to set flag in ctor:{@link #PythonProjectGenerator(boolean)}
- * <br/>
- * <h2>Module vs PyCharm projects</h2>
- * <p>
- * When you create project in PyCharm it always calls {@link #configureProject(Project, VirtualFile, PyNewProjectSettings, Module, PyProjectSynchronizer)},
- * but in Intellij Plugin settings are not ready to the moment of project creation, so there are 2 ways to support plugin:
- *   <ol>
- *     <li>Do not lean on settings at all. You simply implement {@link #configureProjectNoSettings(Project, VirtualFile, Module)}
- *     This way is common for project templates.
- *    </li>
- *    <li>Implement framework as facet. {@link #configureProject(Project, VirtualFile, PyNewProjectSettings, Module, PyProjectSynchronizer)}
- *     will never be called in this case, so you can use "onFacetCreated" event of facet provider</li>
- *   </li>
- *   </ol>
- * </p>
- * <h2>How to report framework installation failures</h2>
- * <p>{@link PyNewProjectSettings#getSdk()} may return null, or something else may prevent package installation.
- * Use {@link #reportPackageInstallationFailure(String, Pair)} in this case.
- * </p>
- *
- * @param <T> project settings
+ * @deprecated Use {@link com.jetbrains.python.newProjectWizard}
  */
+@Deprecated
 public abstract class PythonProjectGenerator<T extends PyNewProjectSettings> extends DirectoryProjectGeneratorBase<T> {
   public static final PyNewProjectSettings NO_SETTINGS = new PyNewProjectSettings();
   private static final Logger LOGGER = Logger.getInstance(PythonProjectGenerator.class);
 
   private final List<SettingsListener> myListeners = ContainerUtil.createLockFreeCopyOnWriteList();
   private final boolean myAllowRemoteProjectCreation;
-  private @Nullable MouseListener myErrorLabelMouseListener;
 
   protected Consumer<String> myErrorCallback;
 
@@ -188,9 +158,6 @@ public abstract class PythonProjectGenerator<T extends PyNewProjectSettings> ext
       final Sdk createdSdk = ((PyLazySdk)sdk).create();
       LOGGER.info(String.format("Lazy PythonSDK generated sdk: %s", createdSdk));
       settings.setSdk(createdSdk);
-      if (createdSdk != null && !useNewInterpreterCreationUi()) {
-        SdkConfigurationUtil.addSdk(createdSdk);
-      }
     }
 
     final PyProjectSynchronizer synchronizer = sdk != null ? PyProjectSynchronizerProvider.getSynchronizer(sdk) : null;
@@ -310,17 +277,6 @@ public abstract class PythonProjectGenerator<T extends PyNewProjectSettings> ext
   }
 
   public void afterProjectGenerated(final @NotNull Project project) {
-  }
-
-  public void addErrorLabelMouseListener(final @NotNull MouseListener mouseListener) {
-    myErrorLabelMouseListener = mouseListener;
-  }
-
-  public @Nullable MouseListener getErrorLabelMouseListener() {
-    return myErrorLabelMouseListener;
-  }
-
-  public void createAndAddVirtualEnv(Project project, PyNewProjectSettings settings) {
   }
 
   /**
@@ -513,9 +469,5 @@ public abstract class PythonProjectGenerator<T extends PyNewProjectSettings> ext
         reportPackageInstallationFailure(requirement, Pair.create(sdk, e));
       }
     }
-  }
-
-  public static boolean useNewInterpreterCreationUi() {
-    return Registry.is("python.new.interpreter.creation.ui") && !PlatformUtils.isDataSpell();
   }
 }

@@ -1,6 +1,7 @@
 // Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.internal.statistic.eventLog
 
+import com.intellij.concurrency.resetThreadContext
 import com.intellij.internal.statistic.eventLog.validator.IntellijSensitiveDataValidator
 import com.intellij.internal.statistic.utils.StatisticsRecorderUtil
 import com.intellij.openapi.Disposable
@@ -87,34 +88,33 @@ open class StatisticsFileEventLogger(private val recorderId: String,
     if (StatisticsRecorderUtil.isTestModeEnabled(recorderId)) {
       lastEventFlushFuture?.cancel(false)
       // call flush() instead of logLastEvent() directly so that logLastEvent is executed on the logExecutor thread and not on scheduled executor pool thread
-      lastEventFlushFuture = AppExecutorUtil.getAppScheduledExecutorService().schedule(this::flush, eventMergeTimeoutMs, TimeUnit.MILLISECONDS)
+      resetThreadContext().use {
+        lastEventFlushFuture = AppExecutorUtil.getAppScheduledExecutorService().schedule(this::flush, eventMergeTimeoutMs, TimeUnit.MILLISECONDS)
+      }
     }
   }
 
   private fun logLastEvent() {
-    try {
-      lastEvent?.let {
-        val event = it.validatedEvent.event
-        if (event.isEventGroup()) {
-          event.data["last"] = lastEventTime
-        }
-        event.data["created"] = lastEventCreatedTime
-        var systemEventId = systemEventIdProvider.getSystemEventId(recorderId)
-        event.data["system_event_id"] = systemEventId
-        systemEventIdProvider.setSystemEventId(recorderId, ++systemEventId)
-
-        if (headless) {
-          event.data["system_headless"] = true
-        }
-        ideMode?.let { event.data["ide_mode"] = ideMode }
-        productMode?.let { event.data["product_mode"] = productMode }
-        writer.log(it.validatedEvent)
-        ApplicationManager.getApplication().getService(EventLogListenersManager::class.java)
-          .notifySubscribers(recorderId, it.validatedEvent, it.rawEventId, it.rawData, false)
+    lastEvent?.let {
+      val event = it.validatedEvent.event
+      if (event.isEventGroup()) {
+        event.data["last"] = lastEventTime
       }
-    } finally {
-      lastEvent = null
+      event.data["created"] = lastEventCreatedTime
+      var systemEventId = systemEventIdProvider.getSystemEventId(recorderId)
+      event.data["system_event_id"] = systemEventId
+      systemEventIdProvider.setSystemEventId(recorderId, ++systemEventId)
+
+      if (headless) {
+        event.data["system_headless"] = true
+      }
+      ideMode?.let { event.data["ide_mode"] = ideMode }
+      productMode?.let { event.data["product_mode"] = productMode }
+      writer.log(it.validatedEvent)
+      ApplicationManager.getApplication().getService(EventLogListenersManager::class.java)
+        .notifySubscribers(recorderId, it.validatedEvent, it.rawEventId, it.rawData, false)
     }
+    lastEvent = null
   }
 
   override fun getActiveLogFile(): EventLogFile? {

@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.maven
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.platform.workspace.jps.entities.LibraryDependency
@@ -99,12 +100,15 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
 
         //detect version
         project.getUserData(KOTLIN_JPS_VERSION_ACCUMULATOR)?.let { version ->
-            KotlinJpsPluginSettings.importKotlinJpsVersionFromExternalBuildSystem(
-                project,
-                version.rawVersion,
-                isDelegatedToExtBuild = MavenRunner.getInstance(project).settings.isDelegateBuildToMaven,
-                externalSystemId = SerializationConstants.MAVEN_EXTERNAL_SOURCE_ID
-            )
+            // Need to execute this and wait to avoid a race condition
+            ApplicationManager.getApplication().invokeAndWait {
+                KotlinJpsPluginSettings.importKotlinJpsVersionFromExternalBuildSystem(
+                    project,
+                    version.rawVersion,
+                    isDelegatedToExtBuild = MavenRunner.getInstance(project).settings.isDelegateBuildToMaven,
+                    externalSystemId = SerializationConstants.MAVEN_EXTERNAL_SOURCE_ID
+                )
+            }
 
             project.putUserData(KOTLIN_JPS_VERSION_ACCUMULATOR, null)
         }
@@ -134,7 +138,7 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
             val commonArguments = KotlinCommonCompilerArgumentsHolder.getInstance(project).settings
             if (compilerArguments == null) {
                 val targetPlatform = platform ?: getDefaultTargetPlatform(project)
-                LOG.debug("Detected target platform {0}", targetPlatform)
+                LOG.debug("Detected target platform ", targetPlatform)
 
                 val argumentsForPlatform = IdePlatformKindProjectStructure.getInstance(project)
                     .getCompilerArguments(targetPlatform.idePlatformKind)
@@ -161,7 +165,7 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
             if (shouldInferLanguageLevel) {
                 languageLevel = (if (useProjectSettings) LanguageVersion.fromVersionString(commonArguments.languageVersion) else null)
                     ?: getDefaultLanguageLevel(compilerVersion, coerceRuntimeLibraryVersionToReleased = false)
-                LOG.debug("Inferred languageLevel to {0}", languageLevel)
+                LOG.debug("Inferred languageLevel to ", languageLevel)
             }
 
             if (shouldInferAPILevel) {
@@ -185,7 +189,7 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
                         languageLevel
                     }
                 }
-                LOG.debug("Inferred apiLevel to {0}", apiLevel)
+                LOG.debug("Inferred apiLevel to ", apiLevel)
             }
             // end of initialize
             this.pureKotlinSourceFolders = pureKotlinSourceFolders
@@ -198,6 +202,7 @@ class KotlinMavenImporterEx : KotlinMavenImporter(), MavenWorkspaceFacetConfigur
         val executionArguments = mavenPlugin.executions
             ?.firstOrNull { it.goals.any { s -> s in compilationGoals } }
             ?.configurationElement?.let { getCompilerArgumentsByConfigurationElement(mavenProject, it, configuredPlatform, project) }
+        LOG.debug("Parsing compiler arguments: ", sharedArguments.args)
         parseCompilerArgumentsToFacetSettings(sharedArguments.args, kotlinFacetSettings, null) //modifiableModelsProvider -> null
         if (executionArguments != null) {
             parseCompilerArgumentsToFacetSettings(executionArguments.args, kotlinFacetSettings, null) //modifiableModelsProvider -> null

@@ -3,10 +3,9 @@
 package com.intellij.ide
 
 import com.intellij.codeWithMe.ClientId
-import com.intellij.codeWithMe.ClientId.Companion.current
+import com.intellij.codeWithMe.ClientId.Companion.currentOrNull
 import com.intellij.codeWithMe.ClientId.Companion.withClientId
-import com.intellij.concurrency.ContextAwareRunnable
-import com.intellij.concurrency.resetThreadContext
+import com.intellij.concurrency.*
 import com.intellij.diagnostic.EventWatcher
 import com.intellij.diagnostic.LoadingState
 import com.intellij.diagnostic.PerformanceWatcher
@@ -20,7 +19,6 @@ import com.intellij.openapi.application.*
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.impl.AnyThreadWriteThreadingSupport
 import com.intellij.openapi.application.impl.InvocationUtil
-import com.intellij.openapi.application.impl.RwLockHolder
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
@@ -40,14 +38,18 @@ import com.intellij.openapi.wm.ex.WindowManagerEx
 import com.intellij.openapi.wm.impl.FocusManagerImpl
 import com.intellij.openapi.wm.impl.IdeFrameImpl
 import com.intellij.platform.ide.bootstrap.StartupErrorReporter
-import com.intellij.platform.ide.bootstrap.isImplicitReadOnEDTDisabled
 import com.intellij.ui.ComponentUtil
+import com.intellij.ui.speedSearch.SpeedSearchSupply
+import com.intellij.util.concurrency.ThreadingAssertions
 import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.concurrency.unwrapContextRunnable
 import com.intellij.util.containers.ContainerUtil
 import com.intellij.util.ui.EDT
 import com.intellij.util.ui.EdtInvocationManager
 import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
+import com.jetbrains.JBR
+import com.jetbrains.TextInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.job
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -79,7 +81,7 @@ class IdeEventQueue private constructor() : EventQueue() {
   private val activityListeners = ContainerUtil.createLockFreeCopyOnWriteList<Runnable>()
 
   @Internal
-  val threadingSupport: ThreadingSupport = if (isNewLockEnabled) AnyThreadWriteThreadingSupport else RwLockHolder
+  val threadingSupport: ThreadingSupport = AnyThreadWriteThreadingSupport
   val keyEventDispatcher: IdeKeyEventDispatcher = IdeKeyEventDispatcher(this)
   val mouseEventDispatcher: IdeMouseEventDispatcher = IdeMouseEventDispatcher()
   val popupManager: IdePopupManager = IdePopupManager()
@@ -153,6 +155,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     if (java.lang.Boolean.parseBoolean(System.getProperty("skip.move.resize.events", "true"))) {
       postEventListeners.add { skipMoveResizeEvents(it) } // hot path, do not use method reference
     }
+    addTextInputListener()
   }
 
   companion object {
@@ -337,14 +340,14 @@ class IdeEventQueue private constructor() : EventQueue() {
       val oldEvent = trueCurrentEvent
       trueCurrentEvent = event
       val finalEvent = event
-      val runnable = InvocationUtil.extractRunnable(event)
+      val runnable = InvocationUtil.extractRunnable(event)?.unwrapContextRunnable()
       val runnableClass = runnable?.javaClass ?: Runnable::class.java
       val processEventRunnable = Runnable {
-        withAttachedClientId(event).use {
+        withAttachedClientId(finalEvent).use {
           val progressManager = ProgressManager.getInstanceOrNull()
           try {
             runCustomProcessors(finalEvent, preProcessors)
-            performActivity(finalEvent) {
+            performActivity(finalEvent, isCoroutineWILEnabled && !threadingSupport.isInsideUnlockedWriteIntentLock()) {
               if (progressManager == null) {
                 _dispatchEvent(finalEvent)
               }
@@ -461,18 +464,7 @@ class IdeEventQueue private constructor() : EventQueue() {
 
   @Suppress("UsePropertyAccessSyntax")
   override fun getNextEvent(): AWTEvent {
-    val event = if (isImplicitReadOnEDTDisabled) {
-      super.getNextEvent()
-    }
-    else {
-      val applicationEx = ApplicationManagerEx.getApplicationEx()
-      if (applicationEx != null && appIsLoaded()) {
-        applicationEx.runUnlockingIntendedWrite<AWTEvent, InterruptedException> { super.getNextEvent() }
-      }
-      else {
-        super.getNextEvent()
-      }
-    }
+    val event = super.getNextEvent()
     eventsReturned.incrementAndGet()
     if (isKeyboardEvent(event) && keyboardEventDispatched.incrementAndGet() > keyboardEventPosted.get()) {
       throw RuntimeException("$event; posted: $keyboardEventPosted; dispatched: $keyboardEventDispatched")
@@ -579,9 +571,9 @@ class IdeEventQueue private constructor() : EventQueue() {
             (app.serviceIfCreated<WindowManager>() as? WindowManagerEx)?.dispatchComponentEvent(e)
           }
         }
-        threadingSupport.runWithoutImplicitRead { defaultDispatchEvent(e) }
+        defaultDispatchEvent(e)
       }
-      else -> threadingSupport.runWithoutImplicitRead { defaultDispatchEvent(e) }
+      else -> defaultDispatchEvent(e)
     }
   }
 
@@ -602,8 +594,10 @@ class IdeEventQueue private constructor() : EventQueue() {
     idleTracker()
     synchronized(lock) {
       lastActiveTime = System.nanoTime()
-      for (activityListener in activityListeners) {
-        activityListener.run()
+      resetThreadContext().use {
+        for (activityListener in activityListeners) {
+          activityListener.run()
+        }
       }
     }
   }
@@ -680,10 +674,7 @@ class IdeEventQueue private constructor() : EventQueue() {
       }
       val source = e.source
       if (source is IdeFrameImpl) {
-        when (e.id) {
-          WindowEvent.WINDOW_ACTIVATED -> source.mouseReleaseCountSinceLastActivated = 0
-          MouseEvent.MOUSE_RELEASED -> ++source.mouseReleaseCountSinceLastActivated
-        }
+        source.detectWindowActivationByMousePressed(e)
       }
       super.dispatchEvent(e)
       // collect mnemonics statistics only if a key event was processed above
@@ -712,7 +703,7 @@ class IdeEventQueue private constructor() : EventQueue() {
     }
   }
 
-  fun pumpEventsForHierarchy(modalComponent: Component, exitCondition: Future<*>, eventConsumer: Consumer<AWTEvent>) {
+  fun pumpEventsForHierarchy(modalComponent: Component, exitCondition: Future<*>, eventConsumer: Consumer<AWTEvent>) = resetThreadContext().use {
     EDT.assertIsEdt()
     Logs.LOG.debug { "pumpEventsForHierarchy($modalComponent, $exitCondition)" }
 
@@ -843,9 +834,6 @@ class IdeEventQueue private constructor() : EventQueue() {
   }
 
   private fun attachClientIdIfNeeded(event: AWTEvent): AWTEvent? {
-    if (!ClientId.propagateAcrossThreads) {
-      return null
-    }
     // We don't 'attach' a current client ID to `PeerEvent` instances for two reasons.
     // First, they are often posted to `EventQueue` indirectly (first to `sun.awt.PostEventQueue`, and then to the `EventQueue` by
     // `SunToolkit#flushPendingEvents`), so a current client ID might be unrelated to the code that created those events.
@@ -853,20 +841,33 @@ class IdeEventQueue private constructor() : EventQueue() {
     // and changes the overall events' processing order.
     if (event is InvocationEvent && event !is PeerEvent) {
       val runnable = InvocationUtil.extractRunnable(event)
-      if (runnable is ContextAwareRunnable) {
+      if (runnable == null || runnable is ContextAwareRunnable) {
         return null
       }
-      val clientId = current
-      return InvocationEvent(event.source) { withClientId(clientId).use { dispatchEvent(event) } }
+      if (InvocationUtil.replaceRunnable(event, captureThreadContext(runnable))) {
+        return event
+      }
+      else {
+        val captured = currentThreadContext()
+        // capture context with a fallback way, but it produces the second InvocationEvent which has to delegate to the former one
+        return InvocationEvent(event.source, ContextAwareRunnable {
+          // the manual call of the former event's dispatch() is required here because EventQueue.invokeAndWait() expects
+          // that the invocation event's notifier is signaled and isDispatched() == true.
+          // If not dispatch the original event, it hangs forever
+          installThreadContext(captured).use {
+            event.dispatch()
+          }
+        })
+      }
     }
     if (event.id in ComponentEvent.COMPONENT_FIRST..ComponentEvent.COMPONENT_LAST) {
-      return ComponentEventWithClientId((event as ComponentEvent).component, event.id, current)
+      return ComponentEventWithClientId((event as ComponentEvent).component, event.id, currentOrNull)
     }
     return null
   }
 
   private fun withAttachedClientId(event: AWTEvent): AccessToken {
-    return if (event is ComponentEventWithClientId) withClientId(event.clientId) else AccessToken.EMPTY_ACCESS_TOKEN
+    return if (event is ClientIdAwareEvent) withClientId(event.clientId) else AccessToken.EMPTY_ACCESS_TOKEN
   }
 
   @Deprecated("Does nothing currently")
@@ -919,6 +920,20 @@ class IdeEventQueue private constructor() : EventQueue() {
 
   fun flushNativeEventQueue() {
     SunToolkit.flushPendingEvents()
+  }
+
+  private fun addTextInputListener() {
+    if (StartupUiUtil.isLWCToolkit()) {
+      JBR.getTextInput()?.setGlobalEventListener(object : TextInput.EventListener {
+        override fun handleSelectTextRangeEvent(event: TextInput.SelectTextRangeEvent) {
+          val source = event.source
+          if (source is JComponent) {
+            val supply = SpeedSearchSupply.getSupply(source, true)
+            supply?.selectTextRange(event.begin, event.length)
+          }
+        }
+      })
+    }
   }
 }
 
@@ -1010,7 +1025,7 @@ private fun isInputEvent(e: AWTEvent): Boolean {
   return e is InputEvent || e is InputMethodEvent || e is WindowEvent || e is ActionEvent
 }
 
-internal fun performActivity(e: AWTEvent, runnable: () -> Unit) {
+internal fun performActivity(e: AWTEvent, needWIL: Boolean, runnable: () -> Unit) {
   var transactionGuard = transactionGuard
   if (transactionGuard == null && appIsLoaded()) {
     val app = ApplicationManager.getApplication()
@@ -1024,7 +1039,20 @@ internal fun performActivity(e: AWTEvent, runnable: () -> Unit) {
     runnable()
   }
   else {
-    val runnableWithWIL = {  WriteIntentReadAction.run(runnable) }
+    val runnableWithWIL =
+      if (needWIL) {
+        {
+          ThreadingAssertions.setImplicitLockOnEDT(true)
+          try {
+            WriteIntentReadAction.run(runnable)
+          } finally {
+            ThreadingAssertions.setImplicitLockOnEDT(false)
+          }
+        }
+      }
+      else {
+        runnable
+      }
     transactionGuard.performActivity(isInputEvent(e) || e is ItemEvent || e is FocusEvent, runnableWithWIL)
   }
 }
@@ -1232,7 +1260,12 @@ private class WindowsAltSuppressor : IdeEventQueue.EventDispatcher {
   }
 }
 
-private class ComponentEventWithClientId(source: Component, id: Int, val clientId: ClientId) : ComponentEvent(source, id)
+@Internal
+interface ClientIdAwareEvent {
+  val clientId: ClientId?
+}
+
+private class ComponentEventWithClientId(source: Component, id: Int, override val clientId: ClientId?) : ComponentEvent(source, id), ClientIdAwareEvent
 
 @Suppress("SpellCheckingInspection")
 private fun abracadabraDaberBoreh(eventQueue: IdeEventQueue) {

@@ -8,6 +8,7 @@ import com.intellij.diagnostic.LoadingState
 import com.intellij.openapi.application.AccessToken
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.Cancellation
+import com.intellij.util.Processor
 import com.intellij.util.SystemProperties
 import com.intellij.util.concurrency.*
 import kotlinx.coroutines.*
@@ -15,8 +16,6 @@ import kotlinx.coroutines.internal.intellij.IntellijCoroutines
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.ApiStatus.Experimental
 import org.jetbrains.annotations.ApiStatus.Internal
-import org.jetbrains.annotations.TestOnly
-import org.jetbrains.annotations.VisibleForTesting
 import java.util.concurrent.Callable
 import java.util.function.Consumer
 import java.util.function.Function
@@ -25,7 +24,8 @@ import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
-private val LOG: Logger = Logger.getInstance("#com.intellij.concurrency")
+private const val category = "#com.intellij.concurrency"
+private val LOG: Logger = Logger.getInstance(category)
 
 /**
  * This class contains an overriding coroutine context for [IntellijCoroutines.currentThreadCoroutineContext].
@@ -79,7 +79,9 @@ private data class InstalledThreadContext(
    * It can be explicitly reset, so `null` is a permitted value.
    */
   val context: CoroutineContext?
-)
+) {
+  val creationTrace: Throwable? = if (isStacktraceLoggingEnabled()) Throwable("$context created at") else null
+}
 
 private val INITIAL_THREAD_CONTEXT = InstalledThreadContext(null, null)
 
@@ -102,20 +104,22 @@ private inline fun currentThreadContextOrFallback(getter: (CoroutineContext?) ->
   }
 }
 
-@VisibleForTesting
-@TestOnly
 @ApiStatus.Internal
-fun currentThreadContextOrNull(): CoroutineContext? {
-  return currentThreadContextOrFallback { null }
+fun currentThreadOverriddenContextOrNull(): CoroutineContext? {
+  return tlCoroutineContext.get().context
 }
 
+@ApiStatus.Internal
+fun currentThreadContextOrNull(): CoroutineContext? {
+  return currentThreadContextOrFallback { it?.minusKey(ContinuationInterceptor) }
+}
 
 /**
  * @return current thread context
  */
 fun currentThreadContext(): CoroutineContext {
   checkContextInstalled()
-  return currentThreadContextOrFallback { it?.minusKey(ContinuationInterceptor) } ?: EmptyCoroutineContext
+  return currentThreadContextOrNull() ?: EmptyCoroutineContext
 }
 
 private fun checkContextInstalled() {
@@ -286,7 +290,13 @@ fun installThreadContext(coroutineContext: CoroutineContext, replace: Boolean = 
     @OptIn(InternalCoroutinesApi::class)
     val currentSnapshot = IntellijCoroutines.currentThreadCoroutineContext()
     if (!replace && previousContext.snapshot === currentSnapshot && previousContext.context != null) {
-      LOG.error("Thread context was already set: $previousContext. \n Most likely, you are using 'runBlocking' instead of 'runBlockingCancellable' somewhere in the asynchronous stack.")
+      LOG.error(Throwable("Thread context was already set: $previousContext. \n " +
+                "Most likely, you are using 'runBlocking' instead of 'runBlockingCancellable' somewhere in the asynchronous stack. \n" +
+                "Also, if you have any kind of manual event queue draining/pumping/flushing/etc \n" +
+                "you have to wrap the loop with `resetThreadContext().use { // your queue draining code }`. \n" +
+                "See usages of resetThreadContext().").apply {
+        addSuppressed(previousContext.creationTrace ?: tracingHint())
+      })
     }
     InstalledThreadContext(currentSnapshot, coroutineContext)
   }
@@ -408,6 +418,27 @@ fun <T, U> captureThreadContext(f : Function<T, U>) : Function<T, U> {
 }
 
 /**
+ * Same as [captureThreadContext] but for a Kotlin lambda
+ */
+@ApiStatus.Internal
+fun <T> captureThreadContext(action: () -> T): () -> T {
+  val c = captureCallableThreadContext(action)
+  return c::call
+}
+
+
+/**
+ * Same as [captureThreadContext] but for [Processor]
+ *
+ * Cannot be named as [captureThreadContext] due to a call-site clash with the overload with a [Function] argument
+ */
+@ApiStatus.Internal
+fun <T> captureThreadContextProcessor(processor: Processor<T>): Processor<T> {
+  val c = captureThreadContext(Function<T, Boolean> { processor.process(it) })
+  return Processor { c.apply(it) }
+}
+
+/**
  * We do not want to mark any custom context elements as internal at all.
  * However, currently it is required until the platform team fixes context invariants.
  * In this doc comment, we shall list all elements that are currently internal. If you want to add something here,
@@ -448,3 +479,6 @@ fun getContextSkeleton(context: CoroutineContext): Set<CoroutineContext.Element>
 fun <V> captureThreadContext(callable: Callable<V>): Callable<V> {
   return captureCallableThreadContext(callable)
 }
+
+private fun isStacktraceLoggingEnabled() = LOG.isTraceEnabled
+private fun tracingHint() = Throwable("To enable stack trace recording set log category '$category' to 'trace'")

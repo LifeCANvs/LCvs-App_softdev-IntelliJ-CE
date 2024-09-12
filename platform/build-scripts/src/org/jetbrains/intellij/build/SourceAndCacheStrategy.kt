@@ -7,6 +7,7 @@ import com.dynatrace.hash4j.hashing.HashStream64
 import com.dynatrace.hash4j.hashing.Hashing
 import java.nio.file.*
 import java.util.*
+import java.util.zip.ZipFile
 import kotlin.io.path.invariantSeparatorsPathString
 
 // `CREATE_NEW`: Ensure that we don't create a new file in a location if one already exists.
@@ -60,13 +61,13 @@ internal sealed interface SourceAndCacheStrategy {
   val source: Source
 
   /**
-   * The [updateDigest] must be called prior to invoking this method.
+   * The [updateAssetDigest] must be called prior to invoking this method.
    */
   fun getHash(): Long
 
   fun getSize(): Long
 
-  fun updateDigest(digest: HashStream64)
+  fun updateAssetDigest(digest: HashStream64)
 }
 
 private class MavenJarSourceAndCacheStrategy(override val source: ZipSource) : SourceAndCacheStrategy {
@@ -76,7 +77,7 @@ private class MavenJarSourceAndCacheStrategy(override val source: ZipSource) : S
 
   override fun getSize() = Files.size(source.file)
 
-  override fun updateDigest(digest: HashStream64) {
+  override fun updateAssetDigest(digest: HashStream64) {
     val relativePath = MAVEN_REPO.relativize(source.file).invariantSeparatorsPathString
     hash = Hashing.komihash5_0().hashCharsToLong(relativePath)
     digest.putString(relativePath)
@@ -88,7 +89,7 @@ private class LazySourceAndCacheStrategy(override val source: LazySource) : Sour
 
   override fun getSize() = 0L
 
-  override fun updateDigest(digest: HashStream64) {
+  override fun updateAssetDigest(digest: HashStream64) {
     digest.putString(source.name)
     digest.putLong(source.hash)
   }
@@ -101,10 +102,32 @@ private class NonMavenJarSourceAndCacheStrategy(override val source: ZipSource) 
 
   override fun getSize() = Files.size(source.file)
 
-  override fun updateDigest(digest: HashStream64) {
-    val fileContent = Files.readAllBytes(source.file)
-    hash = Hashing.komihash5_0().hashBytesToLong(fileContent)
-    digest.putLong(hash).putInt(fileContent.size)
+  override fun updateAssetDigest(digest: HashStream64) {
+    val hasher = Hashing.komihash5_0().hashStream()
+    ZipFile(source.file.toFile()).use { zip ->
+      for (entry in zip.entries()) {
+        hasher.putString(entry.name)
+        if (entry.isDirectory) {
+          continue
+        }
+
+        hasher.putLong(entry.crc)
+        hasher.putLong(entry.size)
+        hasher.putLong(entry.compressedSize)
+        val extra = entry.extra
+        if (extra == null) {
+          hasher.putInt(-1)
+        }
+        else {
+          hasher.putByteArray(extra)
+        }
+      }
+      hasher.putInt(zip.size())
+    }
+    hash = hasher.asLong
+
+    digest.putString(source.file.fileName.toString())
+    digest.putLong(hash)
   }
 }
 
@@ -115,9 +138,8 @@ private class ModuleOutputSourceAndCacheStrategy(override val source: DirSource,
 
   override fun getSize() = 0L
 
-  override fun updateDigest(digest: HashStream64) {
+  override fun updateAssetDigest(digest: HashStream64) {
     digest.putString(name)
-
     hash = computeHashForModuleOutput(source)
     digest.putLong(hash)
   }
@@ -130,9 +152,8 @@ private class InMemorySourceAndCacheStrategy(override val source: InMemoryConten
 
   override fun getSize() = source.data.size.toLong()
 
-  override fun updateDigest(digest: HashStream64) {
+  override fun updateAssetDigest(digest: HashStream64) {
     digest.putString(source.relativePath)
-
     hash = Hashing.komihash5_0().hashBytesToLong(source.data)
     digest.putLong(hash).putInt(source.data.size)
   }
@@ -143,7 +164,7 @@ private class FileSourceCacheStrategy(override val source: FileSource) : SourceA
 
   override fun getSize() = source.size.toLong()
 
-  override fun updateDigest(digest: HashStream64) {
+  override fun updateAssetDigest(digest: HashStream64) {
     digest.putString(source.relativePath)
     digest.putLong(source.hash)
   }

@@ -2702,6 +2702,55 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
     }
 
     @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/override/overrideDeprecation")
+    public static class OverrideDeprecation extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("copyDeprecation1.kt")
+        public void testCopyDeprecation1() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecation1.kt");
+        }
+
+        @TestMetadata("copyDeprecation2.kt")
+        public void testCopyDeprecation2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecation2.kt");
+        }
+
+        @TestMetadata("copyDeprecation3.kt")
+        public void testCopyDeprecation3() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecation3.kt");
+        }
+
+        @TestMetadata("copyDeprecation4.kt")
+        public void testCopyDeprecation4() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecation4.kt");
+        }
+
+        @TestMetadata("copyDeprecationProperty.kt")
+        public void testCopyDeprecationProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecationProperty.kt");
+        }
+
+        @TestMetadata("copyDeprecationWithEscapedMessage.kt")
+        public void testCopyDeprecationWithEscapedMessage() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/copyDeprecationWithEscapedMessage.kt");
+        }
+
+        @TestMetadata("suppressWarning.kt")
+        public void testSuppressWarning() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/override/overrideDeprecation/suppressWarning.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/override/typeMismatchOnOverride")
     public static class TypeMismatchOnOverride extends AbstractHighLevelQuickFixTest {
         @java.lang.Override
@@ -5569,7 +5618,34 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/addAnnotationUseSiteTarget")
+    public static class AddAnnotationUseSiteTarget extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("delegate.kt")
+        public void testDelegate() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addAnnotationUseSiteTarget/delegate.kt");
+        }
+
+        @TestMetadata("get.kt")
+        public void testGet() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addAnnotationUseSiteTarget/get.kt");
+        }
+
+        @TestMetadata("notApplicable.kt")
+        public void testNotApplicable() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addAnnotationUseSiteTarget/notApplicable.kt");
+        }
+    }
 
 
 
@@ -6657,11 +6733,105 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/addUnsafeVarianceAnnotation")
+    public static class AddUnsafeVarianceAnnotation extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("parameterType.kt")
+        public void testParameterType() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addUnsafeVarianceAnnotation/parameterType.kt");
+        }
+
+        @TestMetadata("returnType.kt")
+        public void testReturnType() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/addUnsafeVarianceAnnotation/returnType.kt");
+        }
+    }
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/assignToProperty")
+    public static class AssignToProperty extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("differentNameProperty.kt")
+        public void testDifferentNameProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/differentNameProperty.kt");
+        }
+
+        @TestMetadata("differentNameProperty2.kt")
+        public void testDifferentNameProperty2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/differentNameProperty2.kt");
+        }
+
+        @TestMetadata("differentTypeProperty.kt")
+        public void testDifferentTypeProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/differentTypeProperty.kt");
+        }
+
+        @TestMetadata("differentTypeProperty2.kt")
+        public void testDifferentTypeProperty2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/differentTypeProperty2.kt");
+        }
+
+        @TestMetadata("inSecondaryConstructor.kt")
+        public void testInSecondaryConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/inSecondaryConstructor.kt");
+        }
+
+        @TestMetadata("noProperty.kt")
+        public void testNoProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/noProperty.kt");
+        }
+
+        @TestMetadata("qualifiedThis.kt")
+        public void testQualifiedThis() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/qualifiedThis.kt");
+        }
+
+        @TestMetadata("sameProperty.kt")
+        public void testSameProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/sameProperty.kt");
+        }
+
+        @TestMetadata("sameProperty2.kt")
+        public void testSameProperty2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/sameProperty2.kt");
+        }
+
+        @TestMetadata("sameProperty3.kt")
+        public void testSameProperty3() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/sameProperty3.kt");
+        }
+
+        @TestMetadata("valProperty.kt")
+        public void testValProperty() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/valProperty.kt");
+        }
+
+        @TestMetadata("valProperty2.kt")
+        public void testValProperty2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/assignToProperty/valProperty2.kt");
+        }
+    }
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/callFromPublicInline")
@@ -7181,7 +7351,29 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/declarationCantBeInlined")
+    public static class DeclarationCantBeInlined extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("inClass.kt")
+        public void testInClass() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/declarationCantBeInlined/inClass.kt");
+        }
+
+        @TestMetadata("inInterface.kt")
+        public void testInInterface() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/declarationCantBeInlined/inInterface.kt");
+        }
+    }
 
 
 
@@ -8889,6 +9081,11 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
             runTest("../../../idea/tests/testData/quickfix/implement/enum.kt");
         }
 
+        @TestMetadata("fakeOverride.kt")
+        public void testFakeOverride() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/implement/fakeOverride.kt");
+        }
+
         @TestMetadata("finalClass.kt")
         public void testFinalClass() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/implement/finalClass.kt");
@@ -9402,7 +9599,44 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/inlineTypeParameterFix")
+    public static class InlineTypeParameterFix extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("basic.kt")
+        public void testBasic() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/inlineTypeParameterFix/basic.kt");
+        }
+
+        @TestMetadata("basicMultipleDef.kt")
+        public void testBasicMultipleDef() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/inlineTypeParameterFix/basicMultipleDef.kt");
+        }
+
+        @TestMetadata("function.kt")
+        public void testFunction() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/inlineTypeParameterFix/function.kt");
+        }
+
+        @TestMetadata("typeConstraint.kt")
+        public void testTypeConstraint() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/inlineTypeParameterFix/typeConstraint.kt");
+        }
+
+        @TestMetadata("typeConstraintMultipleDef.kt")
+        public void testTypeConstraintMultipleDef() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/inlineTypeParameterFix/typeConstraintMultipleDef.kt");
+        }
+    }
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/insertDelegationCall")
@@ -9568,6 +9802,25 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         @TestMetadata("noParenthesesWithAnnotation.kt")
         public void testNoParenthesesWithAnnotation() throws Exception {
             runTest("../../../idea/tests/testData/quickfix/migration/missingConstructorKeyword/noParenthesesWithAnnotation.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/migration/removeNameFromFunctionExpression")
+    public static class RemoveNameFromFunctionExpression extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("basic.kt")
+        public void testBasic() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/migration/removeNameFromFunctionExpression/basic.kt");
         }
     }
 
@@ -9788,17 +10041,126 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/properties")
+    public abstract static class Properties extends AbstractHighLevelQuickFixTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter")
+        public static class ExtensionPropertyInitializerToGetter extends AbstractHighLevelQuickFixTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("baseCase.kt")
+            public void testBaseCase() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter/baseCase.kt");
+            }
+
+            @TestMetadata("baseCaseVar.kt")
+            public void testBaseCaseVar() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter/baseCaseVar.kt");
+            }
+
+            @TestMetadata("baseCaseWithoutTypeAnnotation.kt")
+            public void testBaseCaseWithoutTypeAnnotation() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter/baseCaseWithoutTypeAnnotation.kt");
+            }
+
+            @TestMetadata("dontShowQuickfixOnExistingAccessors.kt")
+            public void testDontShowQuickfixOnExistingAccessors() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter/dontShowQuickfixOnExistingAccessors.kt");
+            }
+
+            @TestMetadata("insertGetterBeforeExistingSetter.kt")
+            public void testInsertGetterBeforeExistingSetter() throws Exception {
+                runTest("../../../idea/tests/testData/quickfix/properties/extensionPropertyInitializerToGetter/insertGetterBeforeExistingSetter.kt");
+            }
+        }
+    }
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/redundantConst")
+    public static class RedundantConst extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantConst/simple.kt");
+        }
+    }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/redundantFun")
+    public static class RedundantFun extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantFun/simple.kt");
+        }
+    }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/redundantInline")
+    public static class RedundantInline extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("function.kt")
+        public void testFunction() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantInline/function.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/redundantLateinit")
+    public static class RedundantLateinit extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("simple.kt")
+        public void testSimple() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/redundantLateinit/simple.kt");
+        }
+    }
 
 
 
@@ -10677,7 +11039,44 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch")
+    public static class TypeInferenceExpectedTypeMismatch extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("argument.kt")
+        public void testArgument() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch/argument.kt");
+        }
+
+        @TestMetadata("assignment.kt")
+        public void testAssignment() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch/assignment.kt");
+        }
+
+        @TestMetadata("initializer.kt")
+        public void testInitializer() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch/initializer.kt");
+        }
+
+        @TestMetadata("notKClass.kt")
+        public void testNotKClass() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch/notKClass.kt");
+        }
+
+        @TestMetadata("return.kt")
+        public void testReturn() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeInferenceExpectedTypeMismatch/return.kt");
+        }
+    }
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/typeOfAnnotationMember")
@@ -10762,9 +11161,98 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/typeProjection")
+    public static class TypeProjection extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("conflictingProjection.kt")
+        public void testConflictingProjection() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/conflictingProjection.kt");
+        }
 
+        @TestMetadata("projectionInImmediateArgumentToSupertype.kt")
+        public void testProjectionInImmediateArgumentToSupertype() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/projectionInImmediateArgumentToSupertype.kt");
+        }
+
+        @TestMetadata("projectionOnNonClassTypeArgument1.kt")
+        public void testProjectionOnNonClassTypeArgument1() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/projectionOnNonClassTypeArgument1.kt");
+        }
+
+        @TestMetadata("projectionOnNonClassTypeArgument2.kt")
+        public void testProjectionOnNonClassTypeArgument2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/projectionOnNonClassTypeArgument2.kt");
+        }
+
+        @TestMetadata("removeRedundantProjection1.kt")
+        public void testRemoveRedundantProjection1() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/removeRedundantProjection1.kt");
+        }
+
+        @TestMetadata("removeRedundantProjection2.kt")
+        public void testRemoveRedundantProjection2() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/removeRedundantProjection2.kt");
+        }
+
+        @TestMetadata("removeVariance.kt")
+        public void testRemoveVariance() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/typeProjection/removeVariance.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/unnecessaryLateinit")
+    public static class UnnecessaryLateinit extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("lateinitWithConstructor.kt")
+        public void testLateinitWithConstructor() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/lateinitWithConstructor.kt");
+        }
+
+        @TestMetadata("lateinitWithInit.kt")
+        public void testLateinitWithInit() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/lateinitWithInit.kt");
+        }
+
+        @TestMetadata("lateinitWithMultipleConstructors.kt")
+        public void testLateinitWithMultipleConstructors() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/lateinitWithMultipleConstructors.kt");
+        }
+
+        @TestMetadata("lateinitWithMultipleConstructorsAndDelegation.kt")
+        public void testLateinitWithMultipleConstructorsAndDelegation() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/lateinitWithMultipleConstructorsAndDelegation.kt");
+        }
+
+        @TestMetadata("lateinitWithMultipleInit.kt")
+        public void testLateinitWithMultipleInit() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/lateinitWithMultipleInit.kt");
+        }
+
+        @TestMetadata("secondaryConstructorDelegateItself.kt")
+        public void testSecondaryConstructorDelegateItself() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/unnecessaryLateinit/secondaryConstructorDelegateItself.kt");
+        }
+    }
 
 
 
@@ -10823,9 +11311,48 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
         }
     }
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/wrapArgumentWithParentheses")
+    public static class WrapArgumentWithParentheses extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
 
+        @TestMetadata("ModifierFormForNonBuiltInSuspend.kt")
+        public void testModifierFormForNonBuiltInSuspend() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/wrapArgumentWithParentheses/ModifierFormForNonBuiltInSuspend.kt");
+        }
 
+        @TestMetadata("ModifierFormForNonBuiltInSuspendFun.kt")
+        public void testModifierFormForNonBuiltInSuspendFun() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/wrapArgumentWithParentheses/ModifierFormForNonBuiltInSuspendFun.kt");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/quickfix/wrapWhenExpressionInParentheses")
+    public static class WrapWhenExpressionInParentheses extends AbstractHighLevelQuickFixTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("logicalExpressionInWhen.kt")
+        public void testLogicalExpressionInWhen() throws Exception {
+            runTest("../../../idea/tests/testData/quickfix/wrapWhenExpressionInParentheses/logicalExpressionInWhen.kt");
+        }
+    }
 
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../idea/tests/testData/quickfix/wrongLongSuffix")

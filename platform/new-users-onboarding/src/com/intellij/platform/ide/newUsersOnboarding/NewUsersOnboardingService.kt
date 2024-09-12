@@ -1,8 +1,10 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.ide.newUsersOnboarding
 
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ConfigImportHelper
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -11,12 +13,17 @@ import com.intellij.platform.ide.newUiOnboarding.NewUiOnboardingStep
 import com.intellij.platform.ide.newUsersOnboarding.NewUsersOnboardingStatistics.OnboardingStartingPlace
 import com.intellij.platform.util.coroutines.childScope
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.annotations.ApiStatus
 
+@ApiStatus.Internal
 @Service(Service.Level.PROJECT)
-internal class NewUsersOnboardingService(private val project: Project, private val coroutineScope: CoroutineScope) {
+class NewUsersOnboardingService(private val project: Project, private val coroutineScope: CoroutineScope) {
   // Should be accessed only in EDT
   private var currentExecutor: NewUsersOnboardingExecutor? = null
   private var currentDialog: DialogWrapper? = null
+
+  var wasDialogShownDuringIdeSession: Boolean = false
+    private set
 
   fun showOnboardingDialog() {
     // Close with the other exit code to not trigger showing of notification
@@ -26,6 +33,8 @@ internal class NewUsersOnboardingService(private val project: Project, private v
     currentDialog = dialog
     dialog.show()
 
+    wasDialogShownDuringIdeSession = true
+    PropertiesComponent.getInstance().setValue(NEW_USERS_ONBOARDING_DIALOG_SHOWN_PROPERTY, true)
     NewUsersOnboardingStatistics.logDialogShown(project)
   }
 
@@ -52,6 +61,12 @@ internal class NewUsersOnboardingService(private val project: Project, private v
         // do nothing
       }
     }
+  }
+
+  fun shouldShowOnboardingDialog(): Boolean {
+    return service<NewUsersOnboardingExperiment>().isEnabled() &&
+           !PropertiesComponent.getInstance().getBoolean(NEW_USERS_ONBOARDING_DIALOG_SHOWN_PROPERTY) &&
+           ConfigImportHelper.isNewUser()
   }
 
   fun startOnboarding() {
@@ -92,6 +107,6 @@ internal class NewUsersOnboardingService(private val project: Project, private v
   companion object {
     fun getInstance(project: Project): NewUsersOnboardingService = project.service()
 
-    const val NEW_USERS_ONBOARDING_DIALOG_SHOWN_PROPERTY: String = "NEW_USERS_ONBOARDING_DIALOG_SHOWN"
+    private const val NEW_USERS_ONBOARDING_DIALOG_SHOWN_PROPERTY: String = "NEW_USERS_ONBOARDING_DIALOG_SHOWN"
   }
 }

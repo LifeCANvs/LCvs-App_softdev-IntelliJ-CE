@@ -27,7 +27,7 @@ import com.intellij.internal.statistic.collectors.fus.actions.persistence.Action
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.*
-import com.intellij.openapi.actionSystem.ex.ActionUtil.showDumbModeWarning
+import com.intellij.openapi.actionSystem.ex.ActionUtil.getActionUnavailableMessage
 import com.intellij.openapi.actionSystem.impl.ActionConfigurationCustomizer.LightCustomizeStrategy
 import com.intellij.openapi.application.*
 import com.intellij.openapi.application.impl.RawSwingDispatcher
@@ -45,6 +45,8 @@ import com.intellij.openapi.keymap.impl.KeymapImpl
 import com.intellij.openapi.keymap.impl.UpdateResult
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.blockingContext
+import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.project.DumbServiceImpl
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.ProjectType
 import com.intellij.openapi.util.*
@@ -90,6 +92,7 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Function
 import javax.swing.Icon
+import javax.swing.JLabel
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.resume
 import kotlin.time.Duration
@@ -140,22 +143,11 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
 
     this.keymapToOperations = keymapToOperations
 
-    val mutator = PreInitActionRuntimeRegistrar(idToAction = idToAction, actionRegistrar = actionPreInitRegistrar)
-
-    val heavyTasks = mutableListOf<ActionConfigurationCustomizer.CustomizeStrategy>()
-    ActionConfigurationCustomizer.EP.forEachExtensionSafe { extension ->
-      val customizeStrategy = extension.customize()
-      if (customizeStrategy is LightCustomizeStrategy) {
-        // same thread - mutator is not thread-safe by intention
-        // todo use plugin-aware coroutineScope
-        coroutineScope.launch(Dispatchers.Unconfined) {
-          customizeStrategy.customize(mutator)
-        }
-      }
-      else {
-        heavyTasks.add(customizeStrategy)
-      }
-    }
+    val heavyTasks = preInitRegistration(
+      idToAction = idToAction,
+      actionPreInitRegistrar = actionPreInitRegistrar,
+      coroutineScope = coroutineScope,
+    )
 
     // by intention, _after_ doRegisterActions
     actionPostInitRegistrar = PostInitActionRegistrar(idToAction = idToAction, boundShortcuts = boundShortcuts, state = state)
@@ -178,7 +170,7 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
     }
 
     DYNAMIC_EP_NAME.forEachExtensionSafe { customizer ->
-      callDynamicRegistration(customizer, mutator)
+      callDynamicRegistration(customizer, actionPostInitRuntimeRegistrar)
     }
 
     DYNAMIC_EP_NAME.addExtensionPointListener(coroutineScope, object : ExtensionPointListener<DynamicActionConfigurationCustomizer> {
@@ -1109,14 +1101,20 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
     for (listener in actionListeners) {
       listener.beforeEditorTyping(c, dataContext)
     }
-    publisher().beforeEditorTyping(c, dataContext)
+    //maybe readaction
+    WriteIntentReadAction.run {
+      publisher().beforeEditorTyping(c, dataContext)
+    }
   }
 
   override fun fireAfterEditorTyping(c: Char, dataContext: DataContext) {
     for (listener in actionListeners) {
       listener.afterEditorTyping(c, dataContext)
     }
-    publisher().afterEditorTyping(c, dataContext)
+    //maybe readaction
+    WriteIntentReadAction.run {
+      publisher().afterEditorTyping(c, dataContext)
+    }
   }
 
   val actionIds: Set<String>
@@ -1192,7 +1190,10 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
       result.isPerformed -> Unit
       result.failureCause is IndexNotReadyException -> {
         LOG.info(result.failureCause)
-        showDumbModeWarning(project, action, event)
+        if (project != null) {
+          val dumbServiceImpl = DumbService.getInstance(project) as DumbServiceImpl
+          dumbServiceImpl.showDumbModeNotificationForFailedAction(getActionUnavailableMessage(event.presentation.text), getId(action))
+        }
       }
       else -> throw result.failureCause
     }
@@ -1229,7 +1230,7 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
     else {
       service<CoreUiCoroutineScopeHolder>().coroutineScope.launch(Dispatchers.EDT) {
         try {
-          tryToExecuteSuspend(action, place, contextComponent, inputEvent, result)
+          tryToExecuteSuspend(action, place, contextComponent, inputEvent, this@ActionManagerImpl, result)
         }
         finally {
           if (!result.isProcessed) {
@@ -1254,7 +1255,6 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
     val listeners: MutableList<TimerListener> = ContainerUtil.createLockFreeCopyOnWriteList()
 
     private var lastTimePerformed = 0
-    private val clientId = ClientId.current
 
     init {
       val connection = ApplicationManager.getApplication().messageBus.simpleConnect()
@@ -1303,11 +1303,8 @@ open class ActionManagerImpl protected constructor(private val coroutineScope: C
 
       _timerEvents.tryEmit(Unit)
 
-      @Suppress("ForbiddenInSuspectContextMethod")
-      withClientId(clientId).use {
-        for (listener in listeners) {
-          runListenerAction(listener)
-        }
+      for (listener in listeners) {
+        runListenerAction(listener)
       }
     }
   }
@@ -1353,7 +1350,7 @@ private fun tryToExecuteNow(action: AnAction,
   val componentAdjusted = PlatformDataKeys.CONTEXT_COMPONENT.getData(wrappedContext) ?: contextComponent
   val actionProcessor = object : ActionProcessor() {}
   val inputEventAdjusted = inputEvent ?: KeyEvent(
-    componentAdjusted, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_UNDEFINED, '\u0000')
+    componentAdjusted ?: JLabel(), KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_UNDEFINED, '\u0000')
   val event = Utils.runWithInputEventEdtDispatcher(componentAdjusted) block@{
     Utils.runUpdateSessionForInputEvent(
       listOf(action), inputEventAdjusted, wrappedContext, place, actionProcessor, presentationFactory) { rearranged, updater, events ->
@@ -1376,6 +1373,7 @@ private suspend fun tryToExecuteSuspend(action: AnAction,
                                         place: String,
                                         contextComponent: Component?,
                                         inputEvent: InputEvent?,
+                                        actionManager: ActionManagerImpl,
                                         result: ActionCallback) {
   (if (contextComponent != null) IdeFocusManager.findInstanceByComponent(contextComponent)
   else IdeFocusManager.getGlobalInstance()).awaitFocusSettlesDown()
@@ -1385,14 +1383,16 @@ private suspend fun tryToExecuteSuspend(action: AnAction,
   }
   val wrappedContext = Utils.createAsyncDataContext(dataContext)
 
+  val uiKind = ActionUiKind.NONE
   val presentationFactory = PresentationFactory()
-  Utils.expandActionGroupSuspend(DefaultActionGroup(action), presentationFactory, wrappedContext, place, false, false)
+  Utils.expandActionGroupSuspend(DefaultActionGroup(action), presentationFactory, wrappedContext, place, uiKind, false)
   val presentation = presentationFactory.getPresentation(action)
   val event = if (presentation.isEnabled) AnActionEvent(
-    inputEvent, wrappedContext, place, presentation, ActionManager.getInstance(), 0, false, false)
+    wrappedContext, presentation, place, uiKind, inputEvent, 0, actionManager)
   else null
   if (event != null && event.presentation.isEnabled) {
-    blockingContext {
+    //todo fix all clients and move locks into them
+    writeIntentReadAction {
       doPerformAction(action, event, result)
     }
   }
@@ -2324,4 +2324,28 @@ private fun registerOrReplaceActionInner(element: XmlElement,
     }
     onActionLoadedFromXml(actionId = id, plugin = plugin)
   }
+}
+
+private fun preInitRegistration(
+  idToAction: HashMap<String, AnAction>,
+  actionPreInitRegistrar: ActionPreInitRegistrar,
+  coroutineScope: CoroutineScope,
+): MutableList<ActionConfigurationCustomizer.CustomizeStrategy> {
+  val mutator = PreInitActionRuntimeRegistrar(idToAction = idToAction, actionRegistrar = actionPreInitRegistrar)
+
+  val heavyTasks = mutableListOf<ActionConfigurationCustomizer.CustomizeStrategy>()
+  ActionConfigurationCustomizer.EP.forEachExtensionSafe { extension ->
+    val customizeStrategy = extension.customize()
+    if (customizeStrategy is LightCustomizeStrategy) {
+      // same thread - mutator is not thread-safe by intention
+      // todo use plugin-aware coroutineScope
+      coroutineScope.launch(Dispatchers.Unconfined) {
+        customizeStrategy.customize(mutator)
+      }
+    }
+    else {
+      heavyTasks.add(customizeStrategy)
+    }
+  }
+  return heavyTasks
 }

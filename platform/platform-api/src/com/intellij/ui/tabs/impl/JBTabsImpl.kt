@@ -15,10 +15,7 @@ import com.intellij.openapi.actionSystem.ex.ActionCopiedShortcutsTracker
 import com.intellij.openapi.actionSystem.ex.ActionManagerEx
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.asContextElement
+import com.intellij.openapi.application.*
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
@@ -482,7 +479,7 @@ open class JBTabsImpl internal constructor(
       glassPane = gp
 
       if (!ApplicationManager.getApplication().isHeadlessEnvironment) {
-        val listener = { _: AWTEvent? ->
+        val listener = AWTEventListener { _: AWTEvent? ->
           if (JBPopupFactory.getInstance().getChildPopups(this@JBTabsImpl).isEmpty()) {
             processFocusChange()
           }
@@ -529,8 +526,8 @@ open class JBTabsImpl internal constructor(
   internal fun isScrollBarAdjusting(): Boolean = scrollBar.valueIsAdjusting
 
   private fun addMouseMotionAwtListener(parentDisposable: Disposable, coroutineScope: CoroutineScope?) {
-    val listener = fun(event: AWTEvent) {
-      val tabRectangle = lastLayoutPass?.headerRectangle ?: return
+    val listener = AWTEventListener { event ->
+      val tabRectangle = lastLayoutPass?.headerRectangle ?: return@AWTEventListener
       event as MouseEvent
       val point = event.point
       SwingUtilities.convertPointToScreen(point, event.component)
@@ -541,7 +538,7 @@ open class JBTabsImpl internal constructor(
       rectangle.location = p
       val inside = rectangle.contains(point)
       if (inside == isMouseInsideTabsArea) {
-        return
+        return@AWTEventListener
       }
 
       isMouseInsideTabsArea = inside
@@ -791,9 +788,11 @@ open class JBTabsImpl internal constructor(
         val anyModality = ModalityState.any().asContextElement()
         (serviceAsync<ActionManager>() as ActionManagerEx).timerEvents.collect {
           withContext(Dispatchers.EDT + anyModality) {
-            val modalityState = ModalityState.stateForComponent(this@JBTabsImpl)
-            if (!ModalityState.current().dominates(modalityState)) {
-              updateTabActions(validateNow = false)
+            writeIntentReadAction {
+              val modalityState = ModalityState.stateForComponent(this@JBTabsImpl)
+              if (!ModalityState.current().dominates(modalityState)) {
+                updateTabActions(validateNow = false)
+              }
             }
           }
         }
@@ -3125,7 +3124,7 @@ open class JBTabsImpl internal constructor(
   }
 
   override fun getActions(originalProvider: Boolean): List<AnAction> {
-    return selectedInfo?.group?.getChildren(null)?.toList() ?: emptyList()
+    return selectedInfo?.group?.let { listOf(it) } ?: emptyList()
   }
 
   val navigationActions: ActionGroup

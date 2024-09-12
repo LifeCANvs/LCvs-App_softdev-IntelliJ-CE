@@ -38,7 +38,6 @@ import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.intellij.openapi.updateSettings.impl.UpdateChecker;
-import com.intellij.openapi.updateSettings.impl.UpdateSettings;
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.FUSEventSource;
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiserStartupActivityKt;
 import com.intellij.openapi.util.NlsContexts;
@@ -82,6 +81,7 @@ import java.util.stream.Collectors;
 
 import static com.intellij.ide.plugins.newui.PluginsViewCustomizerKt.getPluginsViewCustomizer;
 
+@ApiStatus.Internal
 public final class PluginManagerConfigurable
   implements SearchableConfigurable, Configurable.NoScroll, Configurable.NoMargin, Configurable.TopComponentProvider {
 
@@ -392,7 +392,7 @@ public final class PluginManagerConfigurable
           @Override
           protected @NotNull ListPluginComponent createListComponent(@NotNull IdeaPluginDescriptor descriptor,
                                                                      @NotNull PluginsGroup group) {
-            return new ListPluginComponent(myPluginModel, descriptor, group, mySearchListener, true);
+            return new ListPluginComponent(myPluginModel, descriptor, group, searchListener, true);
           }
         };
 
@@ -463,7 +463,7 @@ public final class PluginManagerConfigurable
               LOG.info("Main plugin repository is not available ('" + e.getMessage() + "'). Please check your network settings.");
             }
 
-            for (String host : UpdateSettings.getInstance().getStoredPluginHosts()) {
+            for (String host : RepositoryHelper.getCustomPluginRepositoryHosts()) {
               List<PluginNode> allDescriptors = customRepositoriesMap.get(host);
               if (allDescriptors != null) {
                 String groupName = IdeBundle.message("plugins.configurable.repository.0", host);
@@ -543,7 +543,7 @@ public final class PluginManagerConfigurable
             attributes.add(SearchWords.TAG.getValue());
             attributes.add(SearchWords.SORT_BY.getValue());
             attributes.add(SearchWords.VENDOR.getValue());
-            if (!UpdateSettings.getInstance().getStoredPluginHosts().isEmpty()) {
+            if (!RepositoryHelper.getCustomPluginRepositoryHosts().isEmpty()) {
               attributes.add(SearchWords.REPOSITORY.getValue());
             }
             attributes.add(SearchWords.STAFF_PICKS.getValue());
@@ -599,7 +599,7 @@ public final class PluginManagerConfigurable
                 }
                 yield myVendorsSorted;
               }
-              case REPOSITORY -> UpdateSettings.getInstance().getStoredPluginHosts();
+              case REPOSITORY -> RepositoryHelper.getCustomPluginRepositoryHosts();
               case INTERNAL, SUGGESTED, STAFF_PICKS -> null;
             };
           }
@@ -762,7 +762,7 @@ public final class PluginManagerConfigurable
           @Override
           protected @NotNull ListPluginComponent createListComponent(@NotNull IdeaPluginDescriptor descriptor,
                                                                      @NotNull PluginsGroup group) {
-            return new ListPluginComponent(myPluginModel, descriptor, group, mySearchListener, true);
+            return new ListPluginComponent(myPluginModel, descriptor, group, searchListener, true);
           }
         };
 
@@ -940,7 +940,7 @@ public final class PluginManagerConfigurable
           @Override
           protected @NotNull ListPluginComponent createListComponent(@NotNull IdeaPluginDescriptor descriptor,
                                                                      @NotNull PluginsGroup group) {
-            return new ListPluginComponent(myPluginModel, descriptor, group, mySearchListener, false);
+            return new ListPluginComponent(myPluginModel, descriptor, group, searchListener, false);
           }
         };
 
@@ -1107,7 +1107,7 @@ public final class PluginManagerConfigurable
           @Override
           protected @NotNull ListPluginComponent createListComponent(@NotNull IdeaPluginDescriptor descriptor,
                                                                      @NotNull PluginsGroup group) {
-            return new ListPluginComponent(myPluginModel, descriptor, group, mySearchListener, false);
+            return new ListPluginComponent(myPluginModel, descriptor, group, searchListener, false);
           }
         };
 
@@ -1871,7 +1871,7 @@ public final class PluginManagerConfigurable
     if (showAllPredicate.test(group)) {
       group.rightAction = new LinkLabelButton<>(IdeBundle.message("plugins.configurable.show.all"),
                                                 null,
-                                                myMarketplaceTab.mySearchListener,
+                                                myMarketplaceTab.searchListener,
                                                 showAllQuery);
       group.rightAction.setBorder(JBUI.Borders.emptyRight(5));
     }

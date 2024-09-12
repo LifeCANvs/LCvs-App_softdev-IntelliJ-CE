@@ -26,6 +26,7 @@ import com.intellij.openapi.actionSystem.remoting.ActionWithMergeId;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.UndoConfirmationPolicy;
 import com.intellij.openapi.diagnostic.Logger;
@@ -388,7 +389,7 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
   }
 
   private void updateTrafficLightVisibility() {
-    myStatusUpdates.queue(Update.create("visibility", this::doUpdateTrafficLightVisibility));
+    myStatusUpdates.queue(Update.create("visibility", () -> WriteIntentReadAction.run((Runnable)() -> doUpdateTrafficLightVisibility())));
   }
 
   private void doUpdateTrafficLightVisibility() {
@@ -901,6 +902,8 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
 
     myTrafficLightPopup.hidePopup();
     extensionActions.clear();
+
+    analyzerStatus = AnalyzerStatus.getEMPTY();
 
     super.dispose();
   }
@@ -1622,7 +1625,7 @@ public final class EditorMarkupModelImpl extends MarkupModelImpl
 
         private void showInspectionHint(MouseEvent me) {
           DataContext context = ActionToolbar.getDataContextFor(TrafficLightButton.this);
-          AnActionEvent event = AnActionEvent.createFromInputEvent(me, place, presentation, context, false, true);
+          AnActionEvent event = AnActionEvent.createEvent(context, presentation, place, ActionUiKind.TOOLBAR, me);
           if (ActionUtil.lastUpdateAndCheckDumb(action, event, false)) {
             ActionUtil.performActionDumbAwareWithCallbacks(action, event);
             ActionsCollector.getInstance().record(event.getProject(), action, event, null);

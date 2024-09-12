@@ -22,9 +22,9 @@ import org.jetbrains.annotations.ApiStatus.Internal
  * It is recommended to use [Application.forEachSessionSuspending] instead.
  */
 @RequiresBlockingContext
-inline fun Application.forEachSession(kind: ClientKind, action: (ClientAppSession) -> Unit) {
+fun Application.forEachSession(kind: ClientKind, action: (ClientAppSession) -> Unit) {
   for (session in this.service<ClientSessionsManager<*>>().getSessions(kind)) {
-    ClientId.withClientId(session.clientId) {
+    ClientId.withExplicitClientId(session.clientId) {
       logger<ClientSessionsManager<*>>().runAndLogException {
         action(session as ClientAppSession)
       }
@@ -52,9 +52,9 @@ suspend fun Application.forEachSessionSuspending(kind: ClientKind, action: suspe
  * It is recommended to use [Project.forEachSessionSuspending] instead.
  */
 @RequiresBlockingContext
-inline fun Project.forEachSession(kind: ClientKind, action: (ClientProjectSession) -> Unit) {
+fun Project.forEachSession(kind: ClientKind, action: (ClientProjectSession) -> Unit) {
   for (session in this.service<ClientSessionsManager<*>>().getSessions(kind) as List<ClientProjectSession>) {
-    ClientId.withClientId(session.clientId) {
+    ClientId.withExplicitClientId(session.clientId) {
       logger<ClientSessionsManager<*>>().runAndLogException {
         action(session)
       }

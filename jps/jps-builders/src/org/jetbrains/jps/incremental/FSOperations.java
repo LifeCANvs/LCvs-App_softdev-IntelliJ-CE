@@ -1,10 +1,11 @@
-// Copyright 2000-2023 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.incremental;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.FileCollectionFactory;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.ModuleChunk;
@@ -95,14 +96,16 @@ public final class FSOperations {
    * @return a builder object that marks dirty files and collects data about files marked
    */
   public static <R extends BuildRootDescriptor, T extends BuildTarget<R>> DirtyFilesHolderBuilder<R, T> createDirtyFilesHolderBuilder(CompileContext context, final CompilationRound round) {
-    return new DirtyFilesHolderBuilder<R, T>() {
+    return new DirtyFilesHolderBuilder<>() {
       private final Map<T, Map<R, Set<File>>> dirtyFiles = new HashMap<>();
+
       @Override
       public DirtyFilesHolderBuilder<R, T> markDirtyFile(T target, File file) throws IOException {
         final ProjectDescriptor pd = context.getProjectDescriptor();
         final R rd = pd.getBuildRootIndex().findParentDescriptor(file, Collections.singleton(target.getTargetType()), context);
         if (rd != null) {
-          if (pd.fsState.markDirtyIfNotDeleted(context, round, file, rd, pd.getProjectStamps().getStampStorage()) || pd.fsState.isMarkedForRecompilation(context, round, rd, file)) {
+          if (pd.fsState.markDirtyIfNotDeleted(context, round, file, rd, pd.getProjectStamps().getStampStorage()) ||
+              pd.fsState.isMarkedForRecompilation(context, round, rd, file)) {
             Map<R, Set<File>> targetFiles = dirtyFiles.get(target);
             if (targetFiles == null) {
               targetFiles = new HashMap<>();
@@ -126,7 +129,7 @@ public final class FSOperations {
           public void processDirtyFiles(@NotNull FileProcessor<R, T> processor) throws IOException {
             for (Map.Entry<T, Map<R, Set<File>>> entry : dirtyFiles.entrySet()) {
               final T target = entry.getKey();
-              for (Map.Entry<R, Set<File>>  targetEntry: entry.getValue().entrySet()) {
+              for (Map.Entry<R, Set<File>> targetEntry : entry.getValue().entrySet()) {
                 final R rd = targetEntry.getKey();
                 for (File file : targetEntry.getValue()) {
                   processor.apply(target, file, rd);
@@ -290,12 +293,14 @@ public final class FSOperations {
         else {
           boolean markDirty = forceDirty;
           if (!markDirty) {
-            markDirty = attrs != null?
-              stampStorage.isDirtyStamp(stampStorage.getPreviousStamp(file, rd.getTarget()), file, attrs) :
-              stampStorage.isDirtyStamp(stampStorage.getPreviousStamp(file, rd.getTarget()), file);
+            Path nioFile = file.toPath();
+            StampsStorage.Stamp previousStamp = stampStorage.getPreviousStamp(nioFile, rd.getTarget());
+            markDirty = previousStamp == null || (attrs == null
+                                                  ? stampStorage.isDirtyStamp(previousStamp, nioFile)
+                                                  : stampStorage.isDirtyStamp(previousStamp, nioFile, attrs));
           }
           if (markDirty) {
-            // if it is full project rebuild, all storages are already completely cleared;
+            // if it is a full project rebuild, all storages are already completely cleared;
             // so passing null because there is no need to access the storage to clear non-existing data
             final StampsStorage<? extends StampsStorage.Stamp> marker = context.isProjectRebuild()? null : stampStorage;
             context.getProjectDescriptor().fsState.markDirty(context, round, file, rd, marker, false);
@@ -318,12 +323,18 @@ public final class FSOperations {
     void consume(@NotNull File file, @Nullable BasicFileAttributes attrs) throws IOException;
   }
   
-  public static void traverseRecursively(BuildRootIndex rootIndex, final BuildRootDescriptor rd, final File fromFile, @NotNull FSOperations.FileConsumer processor) throws IOException {
-    traverseRecursively(fromFile, f -> rootIndex.isDirectoryAccepted(f, rd), f -> rootIndex.isFileAccepted(f, rd), processor);
+  public static void traverseRecursively(BuildRootIndex rootIndex,
+                                         BuildRootDescriptor rd,
+                                         File fromFile,
+                                         @NotNull FSOperations.FileConsumer processor) throws IOException {
+    traverseRecursively(fromFile.toPath(), f -> rootIndex.isDirectoryAccepted(f.toPath(), rd), f -> rootIndex.isFileAccepted(f, rd), processor);
   }
 
-  private static void traverseRecursively(final File fromFile, @NotNull FileFilter dirFilter, @NotNull FileFilter fileFilter, @NotNull FSOperations.FileConsumer processor) throws IOException {
-    Files.walkFileTree(fromFile.toPath(), EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
+  private static void traverseRecursively(@NotNull Path fromFile,
+                                          @NotNull FileFilter dirFilter,
+                                          @NotNull FileFilter fileFilter,
+                                          @NotNull FSOperations.FileConsumer processor) throws IOException {
+    Files.walkFileTree(fromFile, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
       @Override
       public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
         if (e instanceof NoSuchFileException) {
@@ -417,7 +428,8 @@ public final class FSOperations {
     return lastModified(file.toPath());
   }
 
-  private static long lastModified(Path path) {
+  @ApiStatus.Internal
+  public static long lastModified(Path path) {
     try {
       return Files.getLastModifiedTime(path).toMillis();
     }
@@ -430,8 +442,8 @@ public final class FSOperations {
   }
 
   public static void copy(File fromFile, File toFile) throws IOException {
-    final Path from = fromFile.toPath();
-    final Path to = toFile.toPath();
+    Path from = fromFile.toPath();
+    Path to = toFile.toPath();
     try {
       try {
         Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);

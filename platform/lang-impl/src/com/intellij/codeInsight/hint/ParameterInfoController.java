@@ -15,6 +15,7 @@ import com.intellij.injected.editor.EditorWindow;
 import com.intellij.lang.parameterInfo.ParameterInfoHandler;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.Inlay;
 import com.intellij.openapi.editor.ScrollType;
@@ -41,6 +42,8 @@ import com.intellij.util.ui.update.MergingUpdateQueue;
 import com.intellij.util.ui.update.Update;
 import org.jetbrains.annotations.NotNull;
 
+import javax.accessibility.Accessible;
+import javax.accessibility.AccessibleContext;
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
@@ -109,7 +112,7 @@ public final class ParameterInfoController extends ParameterInfoControllerBase {
           @Override
           public void run() {
             if (activeLookup != null) {
-              updateComponent();
+              WriteIntentReadAction.run((Runnable)ParameterInfoController.this::updateComponent);
             }
           }
         });
@@ -584,6 +587,24 @@ public final class ParameterInfoController extends ParameterInfoControllerBase {
     @Override
     public String toString() {
       return getComponentCount() == 0 ? "<empty>" : getComponent(0).toString();
+    }
+
+    @Override
+    public AccessibleContext getAccessibleContext() {
+      if (accessibleContext == null) {
+        accessibleContext = new AccessibleJPanel() {
+          @Override
+          public Accessible getAccessibleParent() {
+            Container parent = getParent();
+            if (parent instanceof Accessible accessible) {
+              return accessible;
+            }
+            return super.getAccessibleParent();
+          }
+        };
+      }
+
+      return accessibleContext;
     }
   }
 }

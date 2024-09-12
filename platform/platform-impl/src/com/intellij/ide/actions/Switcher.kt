@@ -29,7 +29,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 import com.intellij.openapi.fileEditor.impl.*
-import com.intellij.openapi.fileEditor.impl.getOpenMode
 import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.progress.blockingContext
 import com.intellij.openapi.project.LightEditActionFactory
@@ -52,12 +51,14 @@ import com.intellij.platform.ide.CoreUiCoroutineScopeHolder
 import com.intellij.ui.*
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBScrollPane.*
 import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.hover.ListHoverListener
 import com.intellij.ui.popup.PopupUpdateProcessorBase
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.speedSearch.FilteringListModel
 import com.intellij.ui.speedSearch.NameFilteringListModel
+import com.intellij.util.SystemProperties
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBDimension
 import com.intellij.util.ui.JBUI
@@ -78,12 +79,17 @@ import java.awt.event.InputEvent
 import java.awt.event.ItemEvent
 import java.awt.event.ItemListener
 import java.awt.event.MouseEvent
+import java.io.File
 import java.util.*
 import javax.swing.*
 import javax.swing.event.ListSelectionEvent
 import javax.swing.event.ListSelectionListener
+import kotlin.io.path.Path
+import kotlin.io.path.pathString
 import kotlin.math.max
 import kotlin.math.min
+
+private const val ACTION_PLACE = "Switcher"
 
 /**
  * @author Konstantin Bulenkov
@@ -138,7 +144,7 @@ object Switcher : BaseSwitcherAction(null) {
 
     init {
       onKeyRelease = SwitcherKeyReleaseListener(if (recent) null else event) { e ->
-        ActionUtil.performInputEventHandlerWithCallbacks(e) {
+        ActionUtil.performInputEventHandlerWithCallbacks(ActionUiKind.POPUP, ACTION_PLACE, e) {
           navigate(e)
         }
       }
@@ -255,7 +261,7 @@ object Switcher : BaseSwitcherAction(null) {
               source.selectedIndex = source.anchorSelectionIndex
             }
             if (source.selectedIndex != -1) {
-              ActionUtil.performInputEventHandlerWithCallbacks(e) {
+              ActionUtil.performInputEventHandlerWithCallbacks(ActionUiKind.POPUP, ACTION_PLACE, e) {
                 navigate(e)
               }
             }
@@ -558,14 +564,33 @@ object Switcher : BaseSwitcherAction(null) {
         val item: SwitcherVirtualFile,
         val mainText: String,
         val statusText: String,
+        val pathText: String,
         val backgroundColor: Color?,
         val foregroundTextColor: Color?,
       )
       ReadAction.nonBlocking<List<ListItemData>> {
         items.map {
+          val parentPath = Path(it.file.presentableUrl).parent
+          val result = if (parentPath == null || parentPath.nameCount == 0) "" else {
+            val filePath = parentPath.pathString
+            val projectPath = project.basePath?.let { FileUtil.toSystemDependentName(it) }
+            if (projectPath != null && FileUtil.isAncestor(projectPath, filePath, true)) {
+              val locationRelativeToProjectDir = FileUtil.getRelativePath(projectPath, filePath, File.separatorChar)
+              if (locationRelativeToProjectDir != null && Path(locationRelativeToProjectDir).nameCount != 0) locationRelativeToProjectDir else filePath
+            }
+            else if (FileUtil.isAncestor(SystemProperties.getUserHome(), filePath, true)) {
+              val locationRelativeToUserHome = FileUtil.getLocationRelativeToUserHome(filePath)
+              if (Path(locationRelativeToUserHome).nameCount != 0) locationRelativeToUserHome else filePath
+            }
+            else {
+              filePath
+            }
+          }
+
           ListItemData(item = it,
-                       mainText = VfsPresentationUtil.getUniquePresentableNameForUI(it.project, it.file),
+                       mainText = VfsPresentationUtil.getPresentableNameForUI(it.project, it.file),
                        statusText = FileUtil.getLocationRelativeToUserHome((it.file.parent ?: it.file).presentableUrl),
+                       pathText = result,
                        backgroundColor = VfsPresentationUtil.getFileBackgroundColor(it.project, it.file),
                        foregroundTextColor = FileStatusManager.getInstance(it.project).getStatus(it.file).color)
         }
@@ -575,6 +600,7 @@ object Switcher : BaseSwitcherAction(null) {
           for (data in list) {
             data.item.mainText = data.mainText
             data.item.statusText = data.statusText
+            data.item.pathText = data.pathText
             data.item.backgroundColor = data.backgroundColor
             data.item.foregroundTextColor = data.foregroundTextColor
           }
@@ -676,9 +702,8 @@ object Switcher : BaseSwitcherAction(null) {
         val dataContext = CustomizedDataContext.withSnapshot(focusDC) { sink ->
           sink[PlatformDataKeys.PREDEFINED_TEXT] = fileName
         }
-        val event = AnActionEvent(e, dataContext, "Switcher",
-                                  gotoAction.templatePresentation.clone(),
-                                  ActionManager.getInstance(), 0)
+        val event = AnActionEvent.createEvent(dataContext, gotoAction.templatePresentation.clone(),
+                                              ACTION_PLACE, ActionUiKind.NONE, e)
         blockingContext {
           ActionUtil.performActionDumbAwareWithCallbacks(gotoAction, event)
         }

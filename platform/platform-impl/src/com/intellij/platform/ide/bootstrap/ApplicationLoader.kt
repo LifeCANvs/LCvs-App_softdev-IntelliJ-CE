@@ -1,11 +1,12 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:JvmName("ApplicationLoader")
 @file:Internal
-@file:Suppress("RAW_RUN_BLOCKING")
+@file:Suppress("RAW_RUN_BLOCKING", "ReplaceJavaStaticMethodWithKotlinAnalog")
 package com.intellij.platform.ide.bootstrap
 
 import com.intellij.diagnostic.COROUTINE_DUMP_HEADER
 import com.intellij.diagnostic.LoadingState
+import com.intellij.diagnostic.PluginException
 import com.intellij.diagnostic.dumpCoroutines
 import com.intellij.diagnostic.logs.LogLevelConfigurationManager
 import com.intellij.ide.*
@@ -35,6 +36,7 @@ import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.extensions.ExtensionPointName
+import com.intellij.openapi.extensions.impl.ExtensionPointImpl
 import com.intellij.openapi.extensions.impl.ExtensionsAreaImpl
 import com.intellij.openapi.extensions.useOrLogError
 import com.intellij.openapi.keymap.KeymapManager
@@ -64,7 +66,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
-import java.util.function.BiFunction
 import kotlin.coroutines.jvm.internal.CoroutineDumpState
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.minutes
@@ -220,7 +221,11 @@ internal suspend fun loadApp(
       val appInitializedListeners = appInitListeners.await()
       span("app initialized callback") {
         // An async scope here is intended for FLOW. FLOW!!! DO NOT USE the surrounding main scope.
-        callAppInitialized(listeners = appInitializedListeners, asyncScope = app.getCoroutineScope())
+        callAppInitialized(listeners = appInitializedListeners)
+      }
+
+      app.getCoroutineScope().launch {
+        executeAsyncAppInitListeners()
       }
     }
 
@@ -231,7 +236,7 @@ internal suspend fun loadApp(
         checkThirdPartyPluginsAllowed()
       }
 
-      addActivateAndWindowsCliListeners()
+      setActivationListeners()
 
       // doesn't block app start-up
       span("post app init tasks") {
@@ -253,6 +258,40 @@ internal suspend fun loadApp(
   }
 }
 
+private val asyncAppListenerAllowListForNonCorePlugin = java.util.Set.of(
+  "com.jetbrains.rdserver.unattendedHost.logs.BackendMessagePoolExporter\$MyAppListener",
+  "com.intellij.settingsSync.SettingsSynchronizerApplicationInitializedListener",
+  "com.intellij.pycharm.ds.jupyter.JupyterDSProjectLifecycleListener",
+  "com.jetbrains.gateway.GatewayBuildDateExpirationListener",
+  "com.intellij.ide.misc.PluginAgreementUpdateScheduler",
+  "org.jetbrains.kotlin.idea.macros.ApplicationWideKotlinBundledPathMacroCleaner",
+  "com.intellij.stats.completion.sender.SenderPreloadingActivity",
+  "com.jetbrains.rider.editorActions.RiderTypedHandlersPreloader",
+  "com.jetbrains.rider.util.idea.LogCleanupActivity",
+  "com.intellij.ide.AgreementUpdater",
+  "com.intellij.internal.statistic.updater.StatisticsJobsScheduler",
+  "com.intellij.internal.statistic.updater.StatisticsStateCollectorsScheduler",
+  "org.jetbrains.kotlin.idea.base.plugin.K2UnsupportedPluginsNotificationActivity",
+)
+
+private fun CoroutineScope.executeAsyncAppInitListeners() {
+  val point = ExtensionPointName<ApplicationActivity>("com.intellij.applicationActivity")
+  for (extension in point.filterableLazySequence()) {
+    val pluginId = extension.pluginDescriptor.pluginId
+    val className = extension.implementationClassName
+    if (pluginId != PluginManagerCore.CORE_ID && !asyncAppListenerAllowListForNonCorePlugin.contains(className)) {
+      LOG.error(PluginException("$className is not allowed to implement ${point.name}", pluginId))
+      continue
+    }
+
+    val listener = extension.instance ?: continue
+    launch(CoroutineName(className)) {
+      listener.execute()
+    }
+  }
+  (point.point as ExtensionPointImpl<ApplicationActivity>).reset()
+}
+
 private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob: Job) {
   coroutineScope {
     launch {
@@ -270,7 +309,7 @@ private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob:
     }
 
     launch(CoroutineName("actionConfigurationCustomizer preloading")) {
-      @Suppress("ControlFlowWithEmptyBody")
+      @Suppress("ControlFlowWithEmptyBody", "unused")
       for (ignored in ActionConfigurationCustomizer.EP.lazySequence()) {
         // just preload
       }
@@ -278,7 +317,7 @@ private suspend fun preloadNonHeadlessServices(app: ApplicationImpl, initLafJob:
 
     // https://youtrack.jetbrains.com/issue/IDEA-341318
     if (SystemInfoRt.isLinux && System.getProperty("idea.linux.scale.workaround", "false").toBoolean()) {
-      // ActionManager can use UISettings (KeymapManager doesn't use, but just to be sure)
+      // ActionManager can use UISettings (KeymapManager doesn't use it, but just to be sure)
       initLafJob.join()
     }
 
@@ -483,8 +522,8 @@ internal fun createAppLocatorFile() {
   }
 }
 
-private fun addActivateAndWindowsCliListeners() {
-  addExternalInstanceListener { rawArgs ->
+private fun setActivationListeners() {
+  setActivationListener { rawArgs ->
     LOG.info("External instance command received")
     val (args, currentDirectory) = if (rawArgs.isEmpty()) emptyList<String>() to null else rawArgs.subList(1, rawArgs.size) to rawArgs[0]
     service<CoreUiCoroutineScopeHolder>().coroutineScope.async {
@@ -492,27 +531,11 @@ private fun addActivateAndWindowsCliListeners() {
     }
   }
 
-  EXTERNAL_LISTENER = BiFunction { currentDirectory, args ->
-    LOG.info("External Windows command received")
-    @Suppress("RAW_RUN_BLOCKING")
-    runBlocking(Dispatchers.Default) {
-      val result = handleExternalCommand(args.asList(), currentDirectory)
-      try {
-        result.future.await().exitCode
-      }
-      catch (t: Throwable) {
-        LOG.error(t)
-        AppExitCodes.ACTIVATE_ERROR
-      }
-    }
-  }
-
   ApplicationManager.getApplication().messageBus.simpleConnect().subscribe(AppLifecycleListener.TOPIC, object : AppLifecycleListener {
     override fun appWillBeClosed(isRestart: Boolean) {
-      addExternalInstanceListener {
+      setActivationListener {
         CompletableDeferred(CliResult(AppExitCodes.ACTIVATE_DISPOSING, IdeBundle.message("activation.shutting.down")))
       }
-      EXTERNAL_LISTENER = BiFunction { _, _ -> AppExitCodes.ACTIVATE_DISPOSING }
     }
   })
 }
@@ -556,10 +579,10 @@ val ApplicationStarter.commandNameFromExtension: String?
       ?.id
 
 @VisibleForTesting
-fun CoroutineScope.callAppInitialized(listeners: List<ApplicationInitializedListener>, asyncScope: CoroutineScope) {
+fun CoroutineScope.callAppInitialized(listeners: List<ApplicationInitializedListener>) {
   for (listener in listeners) {
     launch(CoroutineName(listener::class.java.name)) {
-      listener.execute(asyncScope)
+      listener.execute()
     }
   }
 }

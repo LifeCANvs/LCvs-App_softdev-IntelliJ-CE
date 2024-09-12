@@ -1645,7 +1645,7 @@ org.jetbrains.jps.builders.BuildRootIndex
 - a:getRootFilter(org.jetbrains.jps.builders.BuildRootDescriptor):java.io.FileFilter
 - a:getTargetRoots(org.jetbrains.jps.builders.BuildTarget,org.jetbrains.jps.incremental.CompileContext):java.util.List
 - a:getTempTargetRoots(org.jetbrains.jps.builders.BuildTarget,org.jetbrains.jps.incremental.CompileContext):java.util.List
-- a:isDirectoryAccepted(java.io.File,org.jetbrains.jps.builders.BuildRootDescriptor):Z
+- a:isDirectoryAccepted(java.nio.file.Path,org.jetbrains.jps.builders.BuildRootDescriptor):Z
 - a:isFileAccepted(java.io.File,org.jetbrains.jps.builders.BuildRootDescriptor):Z
 a:org.jetbrains.jps.builders.BuildTarget
 - p:<init>(org.jetbrains.jps.builders.BuildTargetType):V
@@ -1737,10 +1737,6 @@ f:org.jetbrains.jps.builders.impl.BuildTargetChunk
 a:org.jetbrains.jps.builders.java.ExcludedJavaSourceRootProvider
 - <init>():V
 - a:isExcludedFromCompilation(org.jetbrains.jps.model.module.JpsModule,org.jetbrains.jps.model.module.JpsModuleSourceRoot):Z
-f:org.jetbrains.jps.builders.java.FilteredResourceRootDescriptor
-- org.jetbrains.jps.builders.java.ResourceRootDescriptor
-- <init>(java.io.File,org.jetbrains.jps.incremental.ResourcesTarget,java.lang.String,java.util.Set,java.io.FileFilter):V
-- createFileFilter():java.io.FileFilter
 a:org.jetbrains.jps.builders.java.JavaBuilderExtension
 - <init>():V
 - getCompilableModuleTypes():java.util.Set
@@ -1778,29 +1774,19 @@ c:org.jetbrains.jps.builders.java.JavaSourceRootDescriptor
 - f:isGeneratedSources:Z
 - f:isTemp:Z
 - f:root:java.io.File
+- f:rootFile:java.nio.file.Path
 - f:target:org.jetbrains.jps.incremental.ModuleBuildTarget
 - <init>(java.io.File,org.jetbrains.jps.incremental.ModuleBuildTarget,Z,Z,java.lang.String,java.util.Set):V
 - <init>(java.io.File,org.jetbrains.jps.incremental.ModuleBuildTarget,Z,Z,java.lang.String,java.util.Set,java.io.FileFilter):V
 - canUseFileCache():Z
 - createFileFilter():java.io.FileFilter
+- s:createJavaSourceRootDescriptor(java.io.File,org.jetbrains.jps.incremental.ModuleBuildTarget,Z,Z,java.lang.String,java.util.Set,java.io.FileFilter):org.jetbrains.jps.builders.java.JavaSourceRootDescriptor
 - getExcludedRoots():java.util.Set
 - getPackagePrefix():java.lang.String
 - getRootFile():java.io.File
 - getRootId():java.lang.String
 - getTarget():org.jetbrains.jps.incremental.ModuleBuildTarget
 - isGenerated():Z
-c:org.jetbrains.jps.builders.java.ResourceRootDescriptor
-- org.jetbrains.jps.builders.BuildRootDescriptor
-- pf:myFilterForExcludedPatterns:java.io.FileFilter
-- <init>(java.io.File,org.jetbrains.jps.incremental.ResourcesTarget,java.lang.String,java.util.Set):V
-- <init>(java.io.File,org.jetbrains.jps.incremental.ResourcesTarget,java.lang.String,java.util.Set,java.io.FileFilter):V
-- canUseFileCache():Z
-- createFileFilter():java.io.FileFilter
-- getExcludedRoots():java.util.Set
-- getPackagePrefix():java.lang.String
-- getRootFile():java.io.File
-- getRootId():java.lang.String
-- getTarget():org.jetbrains.jps.incremental.ResourcesTarget
 f:org.jetbrains.jps.builders.java.ResourcesTargetType
 - org.jetbrains.jps.builders.ModuleBasedBuildTargetType
 - sf:ALL_TYPES:java.util.List
@@ -1843,7 +1829,8 @@ f:org.jetbrains.jps.builders.storage.BuildDataCorruptedException
 org.jetbrains.jps.builders.storage.BuildDataPaths
 - a:getDataStorageRoot():java.io.File
 - a:getTargetDataRoot(org.jetbrains.jps.builders.BuildTarget):java.io.File
-- a:getTargetDataRoot(org.jetbrains.jps.builders.BuildTargetType,java.lang.String):java.io.File
+- a:getTargetDataRoot(org.jetbrains.jps.builders.BuildTargetType,java.lang.String):java.nio.file.Path
+- a:getTargetDataRootDir(org.jetbrains.jps.builders.BuildTarget):java.nio.file.Path
 - a:getTargetTypeDataRoot(org.jetbrains.jps.builders.BuildTargetType):java.io.File
 - a:getTargetsDataRoot():java.io.File
 org.jetbrains.jps.builders.storage.SourceToOutputMapping
@@ -1867,6 +1854,7 @@ f:org.jetbrains.jps.cmdline.BuildRunner
 - s:isParallelBuildAutomakeEnabled():Z
 - s:isParallelBuildEnabled():Z
 - load(org.jetbrains.jps.incremental.MessageHandler,java.io.File,org.jetbrains.jps.incremental.fs.BuildFSState):org.jetbrains.jps.cmdline.ProjectDescriptor
+- load(org.jetbrains.jps.incremental.MessageHandler,java.nio.file.Path,org.jetbrains.jps.incremental.fs.BuildFSState):org.jetbrains.jps.cmdline.ProjectDescriptor
 - loadModelAndGetJpsProject():org.jetbrains.jps.model.JpsProject
 - runBuild(org.jetbrains.jps.cmdline.ProjectDescriptor,org.jetbrains.jps.api.CanceledStatus,org.jetbrains.jps.incremental.MessageHandler,org.jetbrains.jps.api.BuildType,java.util.List,Z):V
 - setBuilderParams(java.util.Map):V
@@ -2212,17 +2200,11 @@ f:org.jetbrains.jps.incremental.GlobalContextKey
 - com.intellij.openapi.util.Key
 - <init>(java.lang.String):V
 - s:create(java.lang.String):org.jetbrains.jps.incremental.GlobalContextKey
-a:org.jetbrains.jps.incremental.JVMModuleBuildTarget
-- org.jetbrains.jps.builders.ModuleBasedTarget
-- <init>(org.jetbrains.jps.builders.ModuleBasedBuildTargetType,org.jetbrains.jps.model.module.JpsModule):V
-- p:computeRootExcludes(java.io.File,org.jetbrains.jps.indices.ModuleExcludeIndex):java.util.Set
-- findRootDescriptor(java.lang.String,org.jetbrains.jps.builders.BuildRootIndex):org.jetbrains.jps.builders.BuildRootDescriptor
-- getId():java.lang.String
 org.jetbrains.jps.incremental.MessageHandler
 - sf:DEAF:org.jetbrains.jps.incremental.MessageHandler
 - a:processMessage(org.jetbrains.jps.incremental.messages.BuildMessage):V
 f:org.jetbrains.jps.incremental.ModuleBuildTarget
-- org.jetbrains.jps.incremental.JVMModuleBuildTarget
+- org.jetbrains.jps.builders.ModuleBasedTarget
 - sf:REBUILD_ON_DEPENDENCY_CHANGE:java.lang.Boolean
 - <init>(org.jetbrains.jps.model.module.JpsModule,org.jetbrains.jps.builders.java.JavaModuleBuildTargetType):V
 - computeDependencies(org.jetbrains.jps.builders.BuildTargetRegistry,org.jetbrains.jps.builders.TargetOutputIndex):java.util.Collection
@@ -2231,7 +2213,6 @@ f:org.jetbrains.jps.incremental.ModuleBuildTarget
 - getOutputRoots(org.jetbrains.jps.incremental.CompileContext):java.util.Collection
 - getPresentableName():java.lang.String
 - isTests():Z
-- writeConfiguration(org.jetbrains.jps.cmdline.ProjectDescriptor,java.io.PrintWriter):V
 a:org.jetbrains.jps.incremental.ModuleLevelBuilder
 - org.jetbrains.jps.incremental.Builder
 - p:<init>(org.jetbrains.jps.incremental.BuilderCategory):V
@@ -2266,7 +2247,7 @@ f:org.jetbrains.jps.incremental.RebuildRequestedException
 - <init>(java.lang.Throwable):V
 - fillInStackTrace():java.lang.Throwable
 f:org.jetbrains.jps.incremental.ResourcesTarget
-- org.jetbrains.jps.incremental.JVMModuleBuildTarget
+- org.jetbrains.jps.builders.ModuleBasedTarget
 - <init>(org.jetbrains.jps.model.module.JpsModule,org.jetbrains.jps.builders.java.ResourcesTargetType):V
 - computeDependencies(org.jetbrains.jps.builders.BuildTargetRegistry,org.jetbrains.jps.builders.TargetOutputIndex):java.util.Collection
 - computeRootDescriptors(org.jetbrains.jps.model.JpsModel,org.jetbrains.jps.indices.ModuleExcludeIndex,org.jetbrains.jps.indices.IgnoredFileIndex,org.jetbrains.jps.builders.storage.BuildDataPaths):java.util.List
@@ -2275,7 +2256,6 @@ f:org.jetbrains.jps.incremental.ResourcesTarget
 - getPresentableName():java.lang.String
 - isCompiledBeforeModuleLevelBuilders():Z
 - isTests():Z
-- writeConfiguration(org.jetbrains.jps.cmdline.ProjectDescriptor,java.io.PrintWriter):V
 f:org.jetbrains.jps.incremental.StopBuildException
 - org.jetbrains.jps.incremental.ProjectBuildException
 - <init>():V
@@ -2325,15 +2305,6 @@ a:org.jetbrains.jps.incremental.artifacts.ArtifactBasedBuildTargetType
 - computeAllTargets(org.jetbrains.jps.model.JpsModel):java.util.List
 - pa:createArtifactBasedTarget(org.jetbrains.jps.model.artifact.JpsArtifact):org.jetbrains.jps.incremental.artifacts.ArtifactBasedBuildTarget
 - createLoader(org.jetbrains.jps.model.JpsModel):org.jetbrains.jps.builders.BuildTargetLoader
-f:org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget
-- org.jetbrains.jps.incremental.artifacts.ArtifactBasedBuildTarget
-- <init>(org.jetbrains.jps.model.artifact.JpsArtifact):V
-- computeDependencies(org.jetbrains.jps.builders.BuildTargetRegistry,org.jetbrains.jps.builders.TargetOutputIndex):java.util.Collection
-- computeRootDescriptors(org.jetbrains.jps.model.JpsModel,org.jetbrains.jps.indices.ModuleExcludeIndex,org.jetbrains.jps.indices.IgnoredFileIndex,org.jetbrains.jps.builders.storage.BuildDataPaths):java.util.List
-- findRootDescriptor(java.lang.String,org.jetbrains.jps.builders.BuildRootIndex):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor
-- getOutputRoots(org.jetbrains.jps.incremental.CompileContext):java.util.Collection
-- getPresentableName():java.lang.String
-- writeConfiguration(org.jetbrains.jps.cmdline.ProjectDescriptor,java.io.PrintWriter):V
 f:org.jetbrains.jps.incremental.artifacts.ArtifactBuildTargetType
 - org.jetbrains.jps.incremental.artifacts.ArtifactBasedBuildTargetType
 - sf:INSTANCE:org.jetbrains.jps.incremental.artifacts.ArtifactBuildTargetType
@@ -2354,13 +2325,6 @@ f:org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping
 f:org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping$SourcePathAndRootIndex
 - getPath():java.lang.String
 - getRootIndex():I
-f:org.jetbrains.jps.incremental.artifacts.IncArtifactBuilder
-- org.jetbrains.jps.incremental.TargetBuilder
-- sf:BUILDER_ID:java.lang.String
-- <init>():V
-- build(org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget,org.jetbrains.jps.builders.DirtyFilesHolder,org.jetbrains.jps.builders.BuildOutputConsumer,org.jetbrains.jps.incremental.CompileContext):V
-- s:getBuilderName():java.lang.String
-- getPresentableName():java.lang.String
 f:org.jetbrains.jps.incremental.artifacts.JarPathUtil
 - sf:JAR_SEPARATOR:java.lang.String
 - <init>():V
@@ -2376,24 +2340,11 @@ a:org.jetbrains.jps.incremental.artifacts.JpsSyntheticArtifactProvider
 a:org.jetbrains.jps.incremental.artifacts.builders.ArtifactLayoutCustomizationService
 - <init>():V
 - a:getCustomizedLayout(org.jetbrains.jps.model.artifact.JpsArtifact,java.util.Collection):java.util.List
-a:org.jetbrains.jps.incremental.artifacts.builders.LayoutElementBuilderService
-- p:<init>(java.lang.Class):V
-- a:generateInstructions(org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderContext):V
-- getDependencies(org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.builders.TargetOutputIndex):java.util.Collection
-- f:getElementClass():java.lang.Class
-f:org.jetbrains.jps.incremental.artifacts.builders.LayoutElementBuildersRegistry
-- generateInstructions(org.jetbrains.jps.model.artifact.JpsArtifact,org.jetbrains.jps.incremental.artifacts.instructions.CopyToDirectoryInstructionCreator,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderContext):V
-- getDependencies(org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.builders.TargetOutputIndex):java.util.Collection
-- s:getInstance():org.jetbrains.jps.incremental.artifacts.builders.LayoutElementBuildersRegistry
 f:org.jetbrains.jps.incremental.artifacts.impl.ArtifactSorter
 - <init>(org.jetbrains.jps.model.JpsModel):V
 - s:addIncludedArtifacts(java.util.Collection):java.util.Set
 - getArtifactToSelfIncludingNameMap():java.util.Map
 - getArtifactsSortedByInclusion():java.util.List
-f:org.jetbrains.jps.incremental.artifacts.impl.DependentJarsEvaluator
-- <init>():V
-- addJarWithDependencies(org.jetbrains.jps.incremental.artifacts.instructions.JarInfo):V
-- getJars():java.util.Set
 f:org.jetbrains.jps.incremental.artifacts.impl.JarsBuilder
 - <init>(java.util.Set,org.jetbrains.jps.incremental.CompileContext,org.jetbrains.jps.builders.BuildOutputConsumer,org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping):V
 - buildJars():Z
@@ -2411,39 +2362,6 @@ f:org.jetbrains.jps.incremental.artifacts.impl.JpsBuilderArtifactServiceImpl
 - <init>():V
 - getArtifacts(org.jetbrains.jps.model.JpsModel,Z):java.util.Collection
 - getSyntheticArtifacts(org.jetbrains.jps.model.JpsModel):java.util.List
-org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- a:addDirectoryCopyInstructions(java.io.File):V
-- a:addDirectoryCopyInstructions(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter):V
-- a:addDirectoryCopyInstructions(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):V
-- a:addExtractDirectoryInstruction(java.io.File,java.lang.String):V
-- a:addExtractDirectoryInstruction(java.io.File,java.lang.String,com.intellij.openapi.util.Condition):V
-- a:addFileCopyInstruction(java.io.File,java.lang.String):V
-- a:addFileCopyInstruction(java.io.File,java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):V
-- a:archive(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- a:getInstructionsBuilder():org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilder
-- a:getTargetDirectory():java.io.File
-- a:subFolder(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- a:subFolderByRelativePath(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-a:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreatorBase
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- pf:myInstructionsBuilder:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl
-- <init>(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl):V
-- addDirectoryCopyInstructions(java.io.File):V
-- addDirectoryCopyInstructions(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter):V
-- addDirectoryCopyInstructions(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):V
-- addExtractDirectoryInstruction(java.io.File,java.lang.String):V
-- addExtractDirectoryInstruction(java.io.File,java.lang.String,com.intellij.openapi.util.Condition):V
-- addFileCopyInstruction(java.io.File,java.lang.String):V
-- addFileCopyInstruction(java.io.File,java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):V
-- pa:createDirectoryDestination():org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
-- pa:createFileDestination(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
-- getInstructionsBuilder():org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilder
-- pa:onAdded(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor):V
-- a:subFolder(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreatorBase
-- subFolderByRelativePath(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilder
-- a:createCopyingHandler(java.io.File,org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator):org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-- a:getDescriptors():java.util.List
 org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderContext
 - a:enterArtifact(org.jetbrains.jps.model.artifact.JpsArtifact):Z
 - a:getDataPaths():org.jetbrains.jps.builders.storage.BuildDataPaths
@@ -2458,40 +2376,6 @@ f:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuild
 - getModel():org.jetbrains.jps.model.JpsModel
 - getParentArtifacts():java.util.Set
 - leaveArtifact(org.jetbrains.jps.model.artifact.JpsArtifact):V
-f:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilder
-- <init>(org.jetbrains.jps.indices.ModuleExcludeIndex,org.jetbrains.jps.indices.IgnoredFileIndex,org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget,org.jetbrains.jps.model.JpsModel,org.jetbrains.jps.builders.storage.BuildDataPaths):V
-- addDestination(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor):Z
-- createCopyingHandler(java.io.File,org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator):org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-- createFileBasedRoot(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):org.jetbrains.jps.incremental.artifacts.instructions.FileBasedArtifactRootDescriptor
-- createJarBasedRoot(java.io.File,java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo,com.intellij.openapi.util.Condition):org.jetbrains.jps.incremental.artifacts.instructions.JarBasedArtifactRootDescriptor
-- getDescriptors():java.util.List
-- getIgnoredFileIndex():org.jetbrains.jps.indices.IgnoredFileIndex
-- getRootsIndex():org.jetbrains.jps.indices.ModuleExcludeIndex
-- registerJarFile(org.jetbrains.jps.incremental.artifacts.instructions.JarInfo,java.lang.String):Z
-a:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootCopyingHandlerProvider
-- <init>():V
-- a:createCustomHandler(org.jetbrains.jps.model.artifact.JpsArtifact,java.io.File,java.io.File,org.jetbrains.jps.model.artifact.elements.JpsPackagingElement,org.jetbrains.jps.model.JpsModel,org.jetbrains.jps.builders.storage.BuildDataPaths):org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-a:org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor
-- org.jetbrains.jps.builders.BuildRootDescriptor
-- pf:myRoot:java.io.File
-- p:<init>(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,I,org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo):V
-- a:copyFromRoot(java.lang.String,I,java.lang.String,org.jetbrains.jps.incremental.CompileContext,org.jetbrains.jps.builders.BuildOutputConsumer,org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping):V
-- createFileFilter():java.io.FileFilter
-- getDestinationInfo():org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
-- getFilter():org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter
-- pa:getFullPath():java.lang.String
-- f:getRootFile():java.io.File
-- getRootId():java.lang.String
-- getRootIndex():I
-- getTarget():org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget
-- writeConfiguration(java.io.PrintWriter,org.jetbrains.jps.incremental.relativizer.PathRelativizerService):V
-f:org.jetbrains.jps.incremental.artifacts.instructions.CopyToDirectoryInstructionCreator
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreatorBase
-- <init>(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl,java.lang.String):V
-- archive(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- getTargetDirectory():java.io.File
-- subFolder(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.CopyToDirectoryInstructionCreator
 a:org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
 - p:<init>(java.lang.String,java.lang.String):V
 - getOutputFilePath():java.lang.String
@@ -2499,54 +2383,6 @@ a:org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
 f:org.jetbrains.jps.incremental.artifacts.instructions.ExplodedDestinationInfo
 - org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
 - <init>(java.lang.String):V
-f:org.jetbrains.jps.incremental.artifacts.instructions.FileBasedArtifactRootDescriptor
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor
-- <init>(java.io.File,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,I,org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo,org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler):V
-- copyFromRoot(java.lang.String,I,java.lang.String,org.jetbrains.jps.incremental.CompileContext,org.jetbrains.jps.builders.BuildOutputConsumer,org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping):V
-- writeConfiguration(java.io.PrintWriter,org.jetbrains.jps.incremental.relativizer.PathRelativizerService):V
-a:org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-- <init>():V
-- a:copyFile(java.io.File,java.io.File,org.jetbrains.jps.incremental.CompileContext):V
-- createFileFilter():java.io.FileFilter
-- a:writeConfiguration(java.io.PrintWriter):V
-c:org.jetbrains.jps.incremental.artifacts.instructions.FilterCopyHandler
-- org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-- sf:DEFAULT:org.jetbrains.jps.incremental.artifacts.instructions.FileCopyingHandler
-- <init>(java.io.FileFilter):V
-- copyFile(java.io.File,java.io.File,org.jetbrains.jps.incremental.CompileContext):V
-- createFileFilter():java.io.FileFilter
-- writeConfiguration(java.io.PrintWriter):V
-f:org.jetbrains.jps.incremental.artifacts.instructions.JarBasedArtifactRootDescriptor
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor
-- <init>(java.io.File,java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter,I,org.jetbrains.jps.incremental.artifacts.ArtifactBuildTarget,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo,com.intellij.openapi.util.Condition):V
-- copyFromRoot(java.lang.String,I,java.lang.String,org.jetbrains.jps.incremental.CompileContext,org.jetbrains.jps.builders.BuildOutputConsumer,org.jetbrains.jps.incremental.artifacts.ArtifactOutputToSourceMapping):V
-- processEntries(org.jetbrains.jps.incremental.artifacts.instructions.JarBasedArtifactRootDescriptor$EntryProcessor):V
-org.jetbrains.jps.incremental.artifacts.instructions.JarBasedArtifactRootDescriptor$EntryProcessor
-- a:process(java.io.InputStream,java.lang.String,java.util.zip.ZipEntry):V
-f:org.jetbrains.jps.incremental.artifacts.instructions.JarDestinationInfo
-- org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
-- <init>(java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.JarInfo,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo):V
-- getJarInfo():org.jetbrains.jps.incremental.artifacts.instructions.JarInfo
-- getPathInJar():java.lang.String
-f:org.jetbrains.jps.incremental.artifacts.instructions.JarInfo
-- <init>(org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo):V
-- addContent(java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.ArtifactRootDescriptor):V
-- addJar(java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.JarInfo):V
-- getContent():java.util.List
-- getDestination():org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo
-- getPresentableDestination():java.lang.String
-f:org.jetbrains.jps.incremental.artifacts.instructions.PackIntoArchiveInstructionCreator
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreatorBase
-- <init>(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl,org.jetbrains.jps.incremental.artifacts.instructions.JarInfo,java.lang.String,org.jetbrains.jps.incremental.artifacts.instructions.DestinationInfo):V
-- archive(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreator
-- getTargetDirectory():java.io.File
-- subFolder(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.PackIntoArchiveInstructionCreator
-f:org.jetbrains.jps.incremental.artifacts.instructions.SkipAllInstructionCreator
-- org.jetbrains.jps.incremental.artifacts.instructions.ArtifactCompilerInstructionCreatorBase
-- <init>(org.jetbrains.jps.incremental.artifacts.instructions.ArtifactInstructionsBuilderImpl):V
-- archive(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.SkipAllInstructionCreator
-- getTargetDirectory():java.io.File
-- subFolder(java.lang.String):org.jetbrains.jps.incremental.artifacts.instructions.SkipAllInstructionCreator
 a:org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter
 - sf:ALL:org.jetbrains.jps.incremental.artifacts.instructions.SourceFileFilter
 - <init>():V
@@ -2760,6 +2596,7 @@ f:org.jetbrains.jps.incremental.relativizer.PathRelativizerService
 - reportUnhandledPaths():V
 - toFull(java.lang.String):java.lang.String
 - toRelative(java.lang.String):java.lang.String
+- toRelative(java.nio.file.Path):java.lang.String
 c:org.jetbrains.jps.incremental.resources.ResourcesBuilder
 - org.jetbrains.jps.incremental.TargetBuilder
 - <init>():V
@@ -2770,19 +2607,19 @@ org.jetbrains.jps.incremental.resources.StandardResourceBuilderEnabler
 - a:isResourceProcessingEnabled(org.jetbrains.jps.model.module.JpsModule):Z
 a:org.jetbrains.jps.incremental.storage.AbstractStateStorage
 - org.jetbrains.jps.incremental.storage.StorageOwner
-- pf:myDataLock:java.lang.Object
+- pf:dataLock:java.lang.Object
 - <init>(java.io.File,com.intellij.util.io.KeyDescriptor,com.intellij.util.io.DataExternalizer):V
 - appendData(java.lang.Object,java.lang.Object):V
-- clean():V
-- close():V
+- f:clean():V
+- f:close():V
 - flush(Z):V
-- force():V
+- f:force():V
 - getKeys():java.util.Collection
 - getKeysIterator():java.util.Iterator
 - getState(java.lang.Object):java.lang.Object
 - remove(java.lang.Object):V
 - update(java.lang.Object,java.lang.Object):V
-- wipe():Z
+- f:wipe():Z
 f:org.jetbrains.jps.incremental.storage.BuildDataManager
 - sf:PROCESS_CONSTANTS_NON_INCREMENTAL_PROPERTY:java.lang.String
 - <init>(org.jetbrains.jps.builders.storage.BuildDataPaths,org.jetbrains.jps.incremental.storage.BuildTargetsState,org.jetbrains.jps.incremental.relativizer.PathRelativizerService):V
@@ -2816,13 +2653,6 @@ f:org.jetbrains.jps.incremental.storage.BuildTargetConfiguration
 - outputRootWasDeleted(org.jetbrains.jps.incremental.CompileContext):Z
 - save(org.jetbrains.jps.incremental.CompileContext):V
 - storeNonexistentOutputRoots(org.jetbrains.jps.incremental.CompileContext):V
-*f:org.jetbrains.jps.incremental.storage.BuildTargetSourcesState
-- org.jetbrains.jps.incremental.BuildListener
-- <init>(org.jetbrains.jps.incremental.CompileContext):V
-- clearSourcesState():V
-- filesDeleted(org.jetbrains.jps.incremental.messages.FileDeletedEvent):V
-- filesGenerated(org.jetbrains.jps.incremental.messages.FileGeneratedEvent):V
-- reportSourcesState():V
 f:org.jetbrains.jps.incremental.storage.BuildTargetTypeState
 - <init>(org.jetbrains.jps.builders.BuildTargetType,org.jetbrains.jps.incremental.storage.BuildTargetsState):V
 - getAverageTargetBuildTime():J
@@ -2881,6 +2711,7 @@ f:org.jetbrains.jps.incremental.storage.ProjectStamps
 - sf:TRACK_LIBRARY_CONTENT:Z
 - sf:TRACK_LIBRARY_CONTENT_PROPERTY:java.lang.String
 - <init>(java.io.File,org.jetbrains.jps.incremental.storage.BuildTargetsState,org.jetbrains.jps.incremental.relativizer.PathRelativizerService):V
+- <init>(java.nio.file.Path,org.jetbrains.jps.incremental.storage.BuildTargetsState,org.jetbrains.jps.incremental.relativizer.PathRelativizerService):V
 - clean():V
 - close():V
 - getStampStorage():org.jetbrains.jps.incremental.storage.StampsStorage
@@ -2888,13 +2719,13 @@ org.jetbrains.jps.incremental.storage.StampsStorage
 - a:clean():V
 - a:close():V
 - a:force():V
-- a:getCurrentStamp(java.io.File):org.jetbrains.jps.incremental.storage.StampsStorage$Stamp
-- a:getPreviousStamp(java.io.File,org.jetbrains.jps.builders.BuildTarget):org.jetbrains.jps.incremental.storage.StampsStorage$Stamp
-- a:getStorageRoot():java.io.File
-- a:isDirtyStamp(org.jetbrains.jps.incremental.storage.StampsStorage$Stamp,java.io.File):Z
-- a:isDirtyStamp(org.jetbrains.jps.incremental.storage.StampsStorage$Stamp,java.io.File,java.nio.file.attribute.BasicFileAttributes):Z
-- a:removeStamp(java.io.File,org.jetbrains.jps.builders.BuildTarget):V
-- a:saveStamp(java.io.File,org.jetbrains.jps.builders.BuildTarget,org.jetbrains.jps.incremental.storage.StampsStorage$Stamp):V
+- a:getCurrentStamp(java.nio.file.Path):org.jetbrains.jps.incremental.storage.StampsStorage$Stamp
+- a:getPreviousStamp(java.nio.file.Path,org.jetbrains.jps.builders.BuildTarget):org.jetbrains.jps.incremental.storage.StampsStorage$Stamp
+- a:getStorageRoot():java.nio.file.Path
+- a:isDirtyStamp(org.jetbrains.jps.incremental.storage.StampsStorage$Stamp,java.nio.file.Path):Z
+- a:isDirtyStamp(org.jetbrains.jps.incremental.storage.StampsStorage$Stamp,java.nio.file.Path,java.nio.file.attribute.BasicFileAttributes):Z
+- a:removeStamp(java.nio.file.Path,org.jetbrains.jps.builders.BuildTarget):V
+- a:saveStamp(java.nio.file.Path,org.jetbrains.jps.builders.BuildTarget,org.jetbrains.jps.incremental.storage.StampsStorage$Stamp):V
 - a:wipe():Z
 org.jetbrains.jps.incremental.storage.StampsStorage$Stamp
 org.jetbrains.jps.incremental.storage.StorageOwner

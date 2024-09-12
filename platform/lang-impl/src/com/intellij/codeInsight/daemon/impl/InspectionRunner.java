@@ -20,6 +20,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.TextRange;
@@ -49,6 +50,7 @@ class InspectionRunner {
   private final TextRange myPriorityRange;
   private final boolean myInspectInjected;
   private final boolean myIsOnTheFly;
+  private final boolean myDumbMode;
   private final ProgressIndicator myProgress;
   private final boolean myIgnoreSuppressed;
   private final InspectionProfileWrapper myInspectionProfileWrapper;
@@ -60,6 +62,7 @@ class InspectionRunner {
                    @NotNull TextRange priorityRange,
                    boolean inspectInjected,
                    boolean isOnTheFly,
+                   boolean dumbMode,
                    @NotNull ProgressIndicator progress,
                    boolean ignoreSuppressed,
                    @NotNull InspectionProfileWrapper inspectionProfileWrapper,
@@ -69,6 +72,7 @@ class InspectionRunner {
     myPriorityRange = priorityRange;
     myInspectInjected = inspectInjected;
     myIsOnTheFly = isOnTheFly;
+    myDumbMode = dumbMode;
     myProgress = progress;
     myIgnoreSuppressed = ignoreSuppressed;
     myInspectionProfileWrapper = inspectionProfileWrapper;
@@ -141,7 +145,7 @@ class InspectionRunner {
     InspectionEngine.withSession(myPsiFile, myRestrictRange, finalPriorityRange, minimumSeverity, myIsOnTheFly, session -> {
       for (LocalInspectionToolWrapper toolWrapper : applicableByLanguage) {
         if (enabledToolsPredicate == null || enabledToolsPredicate.value(toolWrapper)) {
-          LocalInspectionTool tool = toolWrapper.getTool();
+        LocalInspectionTool tool = toolWrapper.getTool();
           AtomicInteger toolWasProcessed = new AtomicInteger();
           ToolStampInfo toolStamps = new ToolStampInfo();
           InspectionProblemHolder holder = new InspectionProblemHolder(myPsiFile, toolWrapper, myIsOnTheFly, myInspectionProfileWrapper,
@@ -153,7 +157,7 @@ class InspectionRunner {
           }
           tool.inspectionStarted(session, myIsOnTheFly);
 
-          List<? extends PsiElement> sortedInside = HighlightInfoUpdaterImpl.sortByPsiElementFertility(myPsiFile, toolWrapper, toolWrapper.runForWholeFile() ? wholeInside : restrictedInside);
+          List<? extends PsiElement> sortedInside = highlightInfoUpdater.sortByPsiElementFertility(myPsiFile, toolWrapper, toolWrapper.runForWholeFile() ? wholeInside : restrictedInside);
           List<? extends PsiElement> outside = toolWrapper.runForWholeFile() ? wholeOutside : restrictedOutside;
           InspectionContext context = new InspectionContext(toolWrapper, holder, visitor, sortedInside, outside, InspectionVisitorOptimizer.getAcceptingPsiTypes(visitor), myPsiFile);
           init.add(context);
@@ -165,6 +169,10 @@ class InspectionRunner {
 
       Processor<? super InspectionContext> contextProcessor = (context) -> {
         executeInImpatientReadAction(()-> {
+          if (DumbService.isDumb(project) != myDumbMode) {
+            // Dumb state change has sneaked between our read actions. Aborting.
+            return;
+          }
           // sequentially to avoid inspection visitor reentrancy
           processContext(context, context.elementsInside(), new InspectionVisitorOptimizer(context.elementsInside()));
           processContext(context, context.elementsOutside(), new InspectionVisitorOptimizer(context.elementsOutside()));
@@ -199,7 +207,7 @@ class InspectionRunner {
         InspectionProfilerDataHolder.saveStats(myPsiFile, init, highlightInfoUpdater);
       }
       if (myIsOnTheFly && addRedundantSuppressions) {
-        addRedundantSuppressions(init, toolWrappers, redundantContexts, applyIncrementallyCallback, contextFinishedCallback);
+        addRedundantSuppressions(init, toolWrappers, redundantContexts, applyIncrementallyCallback, contextFinishedCallback, enabledToolsPredicate);
       }
     });
     return ContainerUtil.concat(init, redundantContexts, injectedContexts);
@@ -286,7 +294,8 @@ class InspectionRunner {
                                         @NotNull List<? extends LocalInspectionToolWrapper> toolWrappers,
                                         @NotNull List<? super InspectionContext> result,
                                         @NotNull ApplyIncrementallyCallback applyIncrementallyCallback,
-                                        @NotNull Consumer<? super InspectionContext> contextFinishedCallback) {
+                                        @NotNull Consumer<? super InspectionContext> contextFinishedCallback,
+                                        @Nullable Condition<? super LocalInspectionToolWrapper> enabledToolsPredicate) {
     for (InspectionContext context : init) {
       LocalInspectionToolWrapper toolWrapper = context.tool;
       LocalInspectionTool tool = toolWrapper.getTool();
@@ -302,20 +311,33 @@ class InspectionRunner {
     if (redundantSuppressionKey == null || !inspectionProfile.isToolEnabled(redundantSuppressionKey, myPsiFile)) {
       return;
     }
+    InspectionToolWrapper<?, ?> redundantSuppressTool = Objects.requireNonNull(
+      inspectionProfile.getInspectionTool(RedundantSuppressInspectionBase.SHORT_NAME, myPsiFile),
+      "inspectionProfile.isToolEnabled(redundantSuppressionKey, myPsiFile) return true, thus an instance must be not-null"
+    );
+
     Language fileLanguage = myPsiFile.getLanguage();
-    InspectionSuppressor suppressor = ContainerUtil.find(LanguageInspectionSuppressors.INSTANCE.allForLanguage(fileLanguage), s -> s instanceof RedundantSuppressionDetector);
-    if (!(suppressor instanceof RedundantSuppressionDetector redundantSuppressionDetector)) {
-      return;
-    }
-    Set<String> activeTools = new HashSet<>();
+
+    RedundantSuppressionDetector redundantSuppressionDetector = findSuppressionDetector(fileLanguage);
+    if (redundantSuppressionDetector == null) return;
+
+    // todo do we really need toolWrappers to figure out active tools?
+    //      I believe `init` parameter already has the correct list of active tools???
+    Set<String> activeTools =  new HashSet<>();
     for (LocalInspectionToolWrapper tool : toolWrappers) {
       if (tool.runForWholeFile()) {
         // no redundants for whole file tools pass
         continue;
       }
-      if (tool.isUnfair() || !tool.isApplicable(fileLanguage) || myInspectionProfileWrapper.getInspectionTool(tool.getShortName(), myPsiFile) instanceof GlobalInspectionToolWrapper) {
+
+      if (tool.isUnfair() ||
+          !tool.isApplicable(fileLanguage) ||
+          myInspectionProfileWrapper.getInspectionTool(tool.getShortName(), myPsiFile) instanceof GlobalInspectionToolWrapper ||
+          !(enabledToolsPredicate != null && enabledToolsPredicate.test(tool))
+      ) {
         continue;
       }
+
       activeTools.add(tool.getID());
       ContainerUtil.addIfNotNull(activeTools, tool.getAlternativeID());
       InspectionElementsMerger elementsMerger = InspectionElementsMerger.getMerger(tool.getShortName());
@@ -323,13 +345,26 @@ class InspectionRunner {
         activeTools.addAll(Arrays.asList(elementsMerger.getSuppressIds()));
       }
     }
-    InspectionToolWrapper<?,?> redundantSuppressTool = inspectionProfile.getInspectionTool(RedundantSuppressInspectionBase.SHORT_NAME, myPsiFile);
+
     RedundantSuppressInspectionBase redundantSuppressGlobalTool = (RedundantSuppressInspectionBase)redundantSuppressTool.getTool();
-    LocalInspectionTool rsLocalTool = redundantSuppressGlobalTool.createLocalTool(redundantSuppressionDetector, mySuppressedElements, activeTools, myRestrictRange);
-    List<LocalInspectionToolWrapper> wrappers = Collections.singletonList(new LocalInspectionToolWrapper(rsLocalTool));
-    InspectionRunner runner = new InspectionRunner(myPsiFile, myRestrictRange, myPriorityRange, myInspectInjected, true, myProgress, false,
-                                                   myInspectionProfileWrapper, mySuppressedElements);
+    LocalInspectionTool rsLocalTool = redundantSuppressGlobalTool.createLocalTool(
+      redundantSuppressionDetector, mySuppressedElements, activeTools, myRestrictRange
+    );
+    LocalInspectionToolWrapper rsWrapper = new LocalInspectionToolWrapper(rsLocalTool);
+    if (enabledToolsPredicate != null && !enabledToolsPredicate.test(rsWrapper)) {
+      return;
+    }
+
+    List<LocalInspectionToolWrapper> wrappers = Collections.singletonList(rsWrapper);
+    InspectionRunner runner = new InspectionRunner(myPsiFile, myRestrictRange, myPriorityRange, myInspectInjected, true,
+                                                   myDumbMode, myProgress, false, myInspectionProfileWrapper,
+                                                   mySuppressedElements);
     result.addAll(runner.inspect(wrappers, HighlightSeverity.WARNING, false, applyIncrementallyCallback, contextFinishedCallback, null));
+  }
+
+  private static @Nullable RedundantSuppressionDetector findSuppressionDetector(@NotNull Language fileLanguage) {
+    List<InspectionSuppressor> allSuppressors = LanguageInspectionSuppressors.INSTANCE.allForLanguage(fileLanguage);
+    return ContainerUtil.findInstance(allSuppressors, RedundantSuppressionDetector.class);
   }
 
   private void executeInImpatientReadAction(@NotNull Runnable runnable) {
@@ -398,9 +433,9 @@ class InspectionRunner {
                   wrappers + "; injectedPsi.getTextRange()=" + injectedPsi.getTextRange() + "; shouldInspect=" + shouldInspect(injectedPsi));
       }
     }
-    InspectionRunner injectedRunner = new InspectionRunner(injectedPsi, injectedPsi.getTextRange(),
-                                                           injectedPriorityRange, false, myIsOnTheFly, myProgress,
-                                                           myIgnoreSuppressed, myInspectionProfileWrapper, mySuppressedElements);
+    InspectionRunner injectedRunner = new InspectionRunner(injectedPsi, injectedPsi.getTextRange(), injectedPriorityRange,
+                                                           false, myIsOnTheFly, myDumbMode, myProgress, myIgnoreSuppressed,
+                                                           myInspectionProfileWrapper, mySuppressedElements);
     ApplyIncrementallyCallback applyInjectionsIncrementallyCallback = (descriptors, holder, visitingPsiElement, shortName) ->
       applyInjectedDescriptor(descriptors, holder, visitingPsiElement, shortName, host, addDescriptorIncrementallyCallback);
     List<? extends InspectionContext> injectedContexts = injectedRunner.inspect(

@@ -120,6 +120,11 @@
 
     <extensionPoint name="lang.structureViewExtension" interface="com.intellij.ide.structureView.StructureViewExtension" dynamic="true"/>
 
+    <extensionPoint name="lang.logicalStructureElementsProvider" beanClass="com.intellij.openapi.util.ClassExtensionPoint" dynamic="true">
+      <with attribute="implementationClass" implements="com.intellij.ide.structureView.logical.LogicalStructureElementsProvider"/>
+    </extensionPoint>
+    <extensionPoint name="lang.logicalStructureTreeElementProvider" interface="com.intellij.ide.structureView.logical.LogicalStructureTreeElementProvider" dynamic="true"/>
+
     <extensionPoint name="lang.surroundDescriptor" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
       <with attribute="implementationClass" implements="com.intellij.lang.surroundWith.SurroundDescriptor"/>
     </extensionPoint>
@@ -698,5 +703,8 @@
                     interface="com.intellij.ide.plugins.marketplace.ranking.MarketplaceLocalRanker"/>
     <extensionPoint qualifiedName="com.intellij.marketplaceTextualFeaturesProvider" dynamic="true"
                     interface="com.intellij.ide.plugins.marketplace.statistics.features.MarketplaceTextualFeaturesProvider"/>
+    <extensionPoint qualifiedName="com.intellij.mlCompletionFeaturesCollector" dynamic="true" beanClass="com.intellij.lang.LanguageExtensionPoint">
+        <with attribute="implementationClass" implements="com.intellij.codeInsight.inline.completion.features.InlineCompletionFeaturesCollector"/>
+    </extensionPoint>
   </extensionPoints>
 </idea-plugin>

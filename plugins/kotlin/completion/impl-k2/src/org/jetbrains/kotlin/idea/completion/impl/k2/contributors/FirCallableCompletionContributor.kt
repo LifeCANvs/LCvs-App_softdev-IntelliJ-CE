@@ -9,12 +9,7 @@ import com.intellij.util.applyIf
 import com.intellij.util.containers.addIfNotNull
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.KaCompletionExtensionCandidateChecker
-import org.jetbrains.kotlin.analysis.api.components.KaExtensionApplicabilityResult
-import org.jetbrains.kotlin.analysis.api.components.KaScopeContext
-import org.jetbrains.kotlin.analysis.api.components.KaScopeKind
-import org.jetbrains.kotlin.analysis.api.components.KaScopeKinds
-import org.jetbrains.kotlin.analysis.api.components.KaScopeWithKindImpl
+import org.jetbrains.kotlin.analysis.api.components.*
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
@@ -54,6 +49,7 @@ import org.jetbrains.kotlin.resolve.ArrayFqNames
 internal open class FirCallableCompletionContributor(
     basicContext: FirBasicCompletionContext,
     priority: Int = 0,
+    private val withTrailingLambda: Boolean = false, // TODO find a better solution
 ) : FirCompletionContributorBase<KotlinNameReferencePositionContext>(basicContext, priority) {
 
     context(KaSession)
@@ -128,7 +124,7 @@ internal open class FirCallableCompletionContributor(
         weighingContext: WeighingContext,
         sessionParameters: FirCompletionSessionParameters,
     ): Unit = with(positionContext) {
-        val visibilityChecker = CompletionVisibilityChecker.create(basicContext, positionContext)
+        val visibilityChecker = CompletionVisibilityChecker(basicContext, positionContext)
         val scopesContext = originalKtFile.scopeContext(nameExpression)
 
         val extensionChecker = if (positionContext is KotlinSimpleNameReferencePositionContext) {
@@ -149,16 +145,17 @@ internal open class FirCallableCompletionContributor(
         }
             .filterIfInsideAnnotationEntryArgument(positionContext.position, weighingContext.expectedType)
             .filterOutShadowedCallables(weighingContext.expectedType)
-            .filterOutUninitializedCallables(positionContext.position)
+            .filterNot(isUninitializedCallable(positionContext.position))
 
         for (callableWithMetadata in callablesWithMetadata) {
             addCallableSymbolToCompletion(
-                weighingContext,
-                callableWithMetadata.signature,
-                callableWithMetadata.options,
-                callableWithMetadata.symbolOrigin,
+                context = weighingContext,
+                signature = callableWithMetadata.signature,
+                options = callableWithMetadata.options,
+                symbolOrigin = callableWithMetadata.symbolOrigin,
                 priority = null,
-                callableWithMetadata.explicitReceiverTypeHint
+                explicitReceiverTypeHint = callableWithMetadata.explicitReceiverTypeHint,
+                withTrailingLambda = withTrailingLambda,
             )
         }
     }
@@ -215,7 +212,7 @@ internal open class FirCallableCompletionContributor(
 
         if (shouldCompleteTopLevelCallablesFromIndex) {
             val topLevelCallablesFromIndex = symbolFromIndexProvider.getTopLevelCallableSymbolsByNameFilter(scopeNameFilter) {
-                !it.canDefinitelyNotBeSeenFromOtherFile() && it.canBeAnalysed()
+                !visibilityChecker.isDefinitelyInvisibleByPsi(it) && it.canBeAnalysed()
             }
 
             topLevelCallablesFromIndex
@@ -436,7 +433,7 @@ internal open class FirCallableCompletionContributor(
         val extensionsFromIndex = symbolFromIndexProvider.getExtensionCallableSymbolsByNameFilter(
             scopeNameFilter,
             receiverTypes,
-        ) { !it.canDefinitelyNotBeSeenFromOtherFile() && it.canBeAnalysed() }
+        ) { !visibilityChecker.isDefinitelyInvisibleByPsi(it) && it.canBeAnalysed() }
 
         return extensionsFromIndex
             .filter { filter(it, sessionParameters) }
@@ -523,42 +520,48 @@ internal open class FirCallableCompletionContributor(
         explicitReceiverTypeHint: KaType? = null,
     ) = CallableWithMetadataForCompletion(signature, explicitReceiverTypeHint, options, symbolOrigin)
 
-    context(KaSession)
-    private fun Sequence<CallableWithMetadataForCompletion>.filterOutUninitializedCallables(
-        position: PsiElement
-    ): Sequence<CallableWithMetadataForCompletion> {
-        val uninitializedCallablesForPosition = collectUninitializedCallablesForPosition(position)
-        return filterNot { it.signature.symbol.psi in uninitializedCallablesForPosition }
-    }
+    private fun isUninitializedCallable(
+        position: PsiElement,
+    ): (CallableWithMetadataForCompletion) -> Boolean {
+        val uninitializedCallablesForPosition = buildSet<KtCallableDeclaration> {
+            for (parent in position.parents(withSelf = false)) {
+                when (val grandParent = parent.parent) {
+                    is KtParameter -> {
+                        if (grandParent.defaultValue == parent) {
+                            // Filter out the current parameter and all parameters initialized after the current one.
+                            // In the following example:
+                            // ```
+                            // fun test(a, b: Int = <caret>, c: Int) {}
+                            // ```
+                            // `a` and `b` should not show up in completion.
+                            val originalOrSelf = getOriginalDeclarationOrSelf(
+                                declaration = grandParent,
+                                originalKtFile = basicContext.originalKtFile,
+                            )
+                            generateSequence(originalOrSelf) { it.nextSiblingOfSameType() }
+                                .forEach(::add)
+                        }
+                    }
 
-    context(KaSession)
-    private fun collectUninitializedCallablesForPosition(position: PsiElement): Set<KtCallableDeclaration> = buildSet {
-        for (parent in position.parents(withSelf = false)) {
-            when (val grandParent = parent.parent) {
-                is KtParameter -> {
-                    if (grandParent.defaultValue == parent) {
-                        // Filter out current parameter and all parameters initialized after current parameter. In the following example:
-                        // ```
-                        // fun test(a, b: Int = <caret>, c: Int) {}
-                        // ```
-                        // `a` and `b` should not show up in completion.
-                        val originalOrSelf = getOriginalDeclarationOrSelf(grandParent, basicContext.originalKtFile)
-                        originalOrSelf.getNextParametersWithSelf().forEach { add(it) }
+                    is KtProperty -> {
+                        if (grandParent.initializer == parent) {
+                            val declaration = getOriginalDeclarationOrSelf(
+                                declaration = grandParent,
+                                originalKtFile = basicContext.originalKtFile,
+                            )
+                            add(declaration)
+                        }
                     }
                 }
 
-                is KtProperty -> {
-                    if (grandParent.initializer == parent) {
-                        add(getOriginalDeclarationOrSelf(grandParent, basicContext.originalKtFile))
-                    }
-                }
+                if (parent is KtDeclaration) break // we can use variable inside lambda or anonymous object located in its initializer
             }
+        }
 
-            if (parent is KtDeclaration) break // we can use variable inside lambda or anonymous object located in its initializer
+        return { callable: CallableWithMetadataForCompletion ->
+            callable.signature.symbol.psi in uninitializedCallablesForPosition
         }
     }
-
-    private fun KtParameter.getNextParametersWithSelf(): Sequence<KtParameter> = generateSequence({ this }, { it.nextSiblingOfSameType() })
 
     context(KaSession)
     private fun Sequence<CallableWithMetadataForCompletion>.filterOutShadowedCallables(

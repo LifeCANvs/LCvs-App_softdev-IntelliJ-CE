@@ -5,6 +5,7 @@ import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.modcommand.ModPsiUpdater;
 import com.intellij.modcommand.PsiUpdateModCommandQuickFix;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.JavaDocTokenType;
 import com.intellij.psi.PsiElement;
@@ -20,11 +21,13 @@ import com.siyeh.ig.BaseInspectionVisitor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author Bas Leijdekkers
  */
-final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspection {
+final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspection implements DumbAware {
   @Override
   protected @NotNull String buildErrorString(Object... infos) {
     return InspectionGadgetsBundle.message("markdown.documentation.comments.migration.display.name");
@@ -44,17 +47,17 @@ final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspect
     @Override
     public void visitDocComment(@NotNull PsiDocComment comment) {
       super.visitDocComment(comment);
-      PsiElement child = comment.getFirstChild();
-      if (!"/**".equals(child.getText())) {
+      if (comment.isMarkdownComment()) {
         return;
       }
-      registerError(isVisibleHighlight(comment) ? child : comment);
+      registerError(isVisibleHighlight(comment) ? comment.getFirstChild() : comment);
     }
   }
 
-  private static class MarkdownDocumentationCommentsMigrationFix extends PsiUpdateModCommandQuickFix {
+  private static class MarkdownDocumentationCommentsMigrationFix extends PsiUpdateModCommandQuickFix implements DumbAware {
 
-    public static final TokenSet SKIP_TOKENS = TokenSet.create(JavaDocTokenType.DOC_COMMENT_START, JavaDocTokenType.DOC_COMMENT_END);
+    private static final TokenSet SKIP_TOKENS = TokenSet.create(JavaDocTokenType.DOC_COMMENT_START, JavaDocTokenType.DOC_COMMENT_END);
+    private static final Pattern HEADING = Pattern.compile("[hH]([1-6])");
 
     @Override
     public @NotNull String getFamilyName() {
@@ -76,6 +79,7 @@ final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspect
         }
         result.append("///").append(line).append('\n');
       }
+      result.append(indent);
 
       Document document = element.getContainingFile().getFileDocument();
       int startOffset = element.getTextOffset();
@@ -151,13 +155,16 @@ final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspect
             continue;
           }
           else if (c == '>') {
-            String name = html.substring(tag + (endTag ? 2 : 1), (html.charAt(i-1) == '/') ? i - 1 : i).trim().toLowerCase(Locale.ENGLISH);
+            int start = tag + (endTag ? 2 : 1);
+            int end = (!endTag && html.charAt(i - 1) == '/') ? i - 1 : i;
+            String name = html.substring(start, end).trim().toLowerCase(Locale.ENGLISH);
+            Matcher matcher; 
             if ("li".equals(name)) {
               if (endTag) {
                 inList = false;
               }
               else {
-                if ("    ".equals(result.substring(result.length() - 4))) {
+                if (result.length() > 4 && "    ".equals(result.substring(result.length() - 4))) {
                   result.delete(result.length() - 4, result.length());
                 }
                 result.append("  - ");
@@ -183,34 +190,11 @@ final class MarkdownDocumentationCommentsMigrationInspection extends BaseInspect
             else if ("ul".equals(name)) {
               if (endTag) inList = false;
             }
-            else if ("h1".equals(name)) {
+            else if ((matcher = HEADING.matcher(name)).matches()) {
               if (!endTag) {
-                result.append("# ");
-              }
-            }
-            else if ("h2".equals(name)) {
-              if (!endTag) {
-                result.append("## ");
-              }
-            }
-            else if ("h3".equals(name)) {
-              if (!endTag) {
-                result.append("### ");
-              }
-            }
-            else if ("h4".equals(name)) {
-              if (!endTag) {
-                result.append("#### ");
-              }
-            }
-            else if ("h5".equals(name)) {
-              if (!endTag) {
-                result.append("##### ");
-              }
-            }
-            else if ("h6".equals(name)) {
-              if (!endTag) {
-                result.append("####### ");
+                int number = matcher.group(1).charAt(0) - '0';
+                result.append("#".repeat(number)).append(' ');
+                if (i + 1 < length && html.charAt(i + 1) == '\n') i++;
               }
             }
             else {

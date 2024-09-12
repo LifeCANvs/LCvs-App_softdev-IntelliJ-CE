@@ -18,6 +18,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.application.ex.ApplicationUtil;
 import com.intellij.openapi.application.impl.ApplicationImpl;
+import com.intellij.openapi.diagnostic.ControlFlowException;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -32,7 +33,6 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -40,6 +40,8 @@ import com.intellij.platform.diagnostic.telemetry.helpers.TraceKt;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Functions;
+import com.intellij.util.ObjectUtils;
+import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.CollectionFactory;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashingStrategy;
@@ -51,7 +53,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.TestOnly;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -80,11 +81,11 @@ final class PassExecutorService implements Disposable {
 
   @Override
   public void dispose() {
-    cancelAll(true, "PassExecutorService.dispose");
     // some workers could, although idle, still retain some thread references for some time causing leak hunter to frown
     // call it from BGT to avoid "calling daemon from EDT" assertion
     Future<?> future = ApplicationManager.getApplication().executeOnPooledThread(() -> {
       ForkJoinPool.commonPool().awaitQuiescence(1, TimeUnit.SECONDS);
+      cancelAll(true, "PassExecutorService.dispose");
     });
     try {
       future.get();
@@ -96,13 +97,17 @@ final class PassExecutorService implements Disposable {
   }
 
   void cancelAll(boolean waitForTermination, @NotNull String reason) {
-    for (Map.Entry<ScheduledPass, Job<Void>> entry : mySubmittedPasses.entrySet()) {
-      Job<Void> job = entry.getValue();
-      ScheduledPass pass = entry.getKey();
-      pass.myUpdateProgress.cancel(reason);
-      job.cancel();
+    if (waitForTermination) {
+      // must not wait in EDT because waitFor() might inadvertently steal some work from FJP and try to run it and fail with "must not execute in EDT"
+      ThreadingAssertions.assertBackgroundThread();
     }
     try {
+      for (Map.Entry<ScheduledPass, Job<Void>> entry : mySubmittedPasses.entrySet()) {
+        Job<Void> job = entry.getValue();
+        ScheduledPass pass = entry.getKey();
+        pass.myUpdateProgress.cancel(reason);
+        job.cancel();
+      }
       if (waitForTermination) {
         while (!waitFor(50)) {
           int i = 0;
@@ -129,7 +134,7 @@ final class PassExecutorService implements Disposable {
                     HighlightingPass @NotNull [] passes,
                     @NotNull DaemonProgressIndicator updateProgress) {
     if (isDisposed()) {
-      ((DaemonCodeAnalyzerImpl)DaemonCodeAnalyzer.getInstance(myProject)).stopMyProcess(updateProgress, true, "PES is disposed");
+      ((DaemonCodeAnalyzerImpl)DaemonCodeAnalyzer.getInstance(myProject)).stopMyProcess(updateProgress, true, null,"PES is disposed");
       return;
     }
     ApplicationManager.getApplication().assertIsNonDispatchThread();
@@ -335,7 +340,10 @@ final class PassExecutorService implements Disposable {
         catch (CancellationException | InterruptedException ignored) {
         }
         catch (ExecutionException e) {
-          LOG.error(e.getCause());
+          Throwable cause = e.getCause();
+          if (!(cause instanceof ControlFlowException)) {
+            LOG.error(cause);
+          }
         }
       });
       mySubmittedPasses.put(pass, job);
@@ -378,10 +386,10 @@ final class PassExecutorService implements Disposable {
           ((FileTypeManagerImpl)FileTypeManager.getInstance()).cacheFileTypesInside(() -> doRun());
         }
         catch (ApplicationUtil.CannotRunReadActionException e) {
-          myUpdateProgress.cancel();
+          myUpdateProgress.cancel(e, "CannotRunReadActionException");
         }
         catch (RuntimeException | Error e) {
-          saveException(e, myUpdateProgress);
+          myUpdateProgress.cancel(e, "exception thrown");
           throw e;
         }
       });
@@ -408,10 +416,10 @@ final class PassExecutorService implements Disposable {
 
             if (!myUpdateProgress.isCanceled() && !myProject.isDisposed()) {
               String fileName = myFileEditor.getFile().getName();
-              String passClassName = StringUtil.getShortName(myPass.getClass());
+              String passClassName = myPass.getClass().getSimpleName();
               try (Scope __ = myOpenTelemetryContext.makeCurrent()) {
                 TraceKt.use(HighlightingPassTracer.HIGHLIGHTING_PASS_TRACER.spanBuilder(passClassName), span -> {
-                  Activity startupActivity = StartUpMeasurer.startActivity("running " + passClassName);
+                  Activity startupActivity = StartUpMeasurer.startActivity(passClassName);
                   boolean cancelled = false;
                   try (AccessToken ignored = ClientId.withClientId(ClientFileEditorManager.getClientId(myFileEditor))) {
                     myPass.collectInformation(myUpdateProgress);
@@ -434,7 +442,8 @@ final class PassExecutorService implements Disposable {
             log(myUpdateProgress, myPass, "Canceled ");
             if (!myUpdateProgress.isCanceled()) {
               //in case some smart asses throw PCE just for fun
-              ((DaemonCodeAnalyzerImpl)DaemonCodeAnalyzer.getInstance(myProject)).stopMyProcess(myUpdateProgress, true, "PCE was thrown by pass");
+              ((DaemonCodeAnalyzerImpl)DaemonCodeAnalyzer.getInstance(myProject)).stopMyProcess(myUpdateProgress, true,
+                                                                                                ObjectUtils.notNull(e.getCause(), e), "PCE was thrown by pass");
               if (LOG.isDebugEnabled()) {
                 LOG.debug("PCE was thrown by " + myPass.getClass(), e);
               }
@@ -580,15 +589,6 @@ final class PassExecutorService implements Disposable {
         LOG.debug(message);
       }
     }
-  }
-
-  private static final Key<Throwable> THROWABLE_KEY = Key.create("THROWABLE_KEY");
-  static void saveException(@NotNull Throwable e, @NotNull DaemonProgressIndicator indicator) {
-    indicator.putUserDataIfAbsent(THROWABLE_KEY, e);
-  }
-  @TestOnly
-  static Throwable getSavedException(@NotNull DaemonProgressIndicator indicator) {
-    return indicator.getUserData(THROWABLE_KEY);
   }
 
   // return true if terminated

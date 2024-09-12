@@ -103,7 +103,7 @@ final class ServiceViewActionProvider {
       group.add(collapseAllAction);
     }
 
-    ActionToolbar treeActionsToolBar = ActionManager.getInstance().createActionToolbar(ActionPlaces.SERVICES_TOOLBAR, group, true);
+    ActionToolbar treeActionsToolBar = ActionManager.getInstance().createActionToolbar(ActionPlaces.SERVICES_TREE_TOOLBAR, group, true);
     treeActionsToolBar.setTargetComponent(component);
     return treeActionsToolBar;
   }
@@ -253,7 +253,7 @@ final class ServiceViewActionProvider {
     if (descriptor == null) return AnAction.EMPTY_ARRAY;
 
     ActionGroup group = toolbar ? descriptor.getToolbarActions() : descriptor.getPopupActions();
-    return group == null ? AnAction.EMPTY_ARRAY : group.getChildren(e);
+    return group == null ? AnAction.EMPTY_ARRAY : new AnAction[] { group };
   }
 
   public static JComponent createEmptyToolbar(boolean horizontal, JComponent targetComponent) {

@@ -4,6 +4,8 @@
 
 package com.intellij.serviceContainer
 
+import com.intellij.codeWithMe.ClientIdContextElement
+import com.intellij.codeWithMe.ClientIdContextElementPrecursor
 import com.intellij.concurrency.currentTemporaryThreadContextOrNull
 import com.intellij.concurrency.resetThreadContext
 import com.intellij.concurrency.withThreadLocal
@@ -17,6 +19,7 @@ import com.intellij.ide.plugins.cl.PluginAwareClassLoader
 import com.intellij.idea.AppMode.isLightEdit
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.*
+import com.intellij.openapi.client.ClientKind
 import com.intellij.openapi.components.*
 import com.intellij.openapi.components.ServiceDescriptor.PreloadMode
 import com.intellij.openapi.components.impl.stores.ComponentStoreOwner
@@ -159,9 +162,14 @@ abstract class ComponentManagerImpl(
     }
   }
 
+  @OptIn(DelicateCoroutinesApi::class)
   private val scopeHolder = ScopeHolder(
     parentScope = parentScope,
-    additionalContext = additionalContext + this.asContextElement(),
+    additionalContext = (additionalContext + this.asContextElement()).let { context ->
+      val clientIdContextElement = context[ClientIdContextElement.Key]
+      return@let if (clientIdContextElement == null) context + ClientIdContextElementPrecursor
+      else context
+    },
     containerName = debugString(short = true),
   )
 
@@ -812,9 +820,10 @@ abstract class ComponentManagerImpl(
     implementation: Class<*>,
     pluginDescriptor: PluginDescriptor,
     override: Boolean,
+    clientKind: ClientKind? = null
   ) {
     val descriptor = ServiceDescriptor(serviceInterface.name, implementation.name, null, null, false,
-                                       null, PreloadMode.FALSE, null, null)
+                                       null, PreloadMode.FALSE, clientKind, null)
     serviceContainer.registerInitializer(
       keyClass = serviceInterface,
       initializer = ServiceClassInstanceInitializer(

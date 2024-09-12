@@ -1125,7 +1125,7 @@ public final class JBUI {
       }
 
       public static int defaultHeaderHeight() {
-        return 42;
+        return 41;
       }
 
       public static JBInsets headerLabelLeftRightInsets() {
@@ -1535,7 +1535,7 @@ public final class JBUI {
       }
 
       public static Insets separatorInsets() {
-        return insets("Popup.separatorInsets", insets(4, 12));
+        return insets("Popup.separatorInsets", insets(4, 8));
       }
 
       public static Insets separatorLabelInsets() {

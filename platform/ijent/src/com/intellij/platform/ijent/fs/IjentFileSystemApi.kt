@@ -2,21 +2,19 @@
 package com.intellij.platform.ijent.fs
 
 import com.intellij.openapi.util.NlsSafe
-import com.intellij.platform.ijent.*
-import kotlinx.coroutines.CoroutineScope
+import com.intellij.platform.ijent.IjentInfo
+import com.intellij.platform.ijent.IjentPosixInfo
+import com.intellij.platform.ijent.IjentUnavailableException
+import com.intellij.platform.ijent.IjentWindowsInfo
+import com.intellij.platform.ijent.fs.IjentFileSystemApi.StatError
 import java.nio.ByteBuffer
 
 // TODO Integrate case-(in)sensitiveness into the interface.
 
 sealed interface IjentFileSystemApi {
-  /**
-   * The same [CoroutineScope] as in the corresponding [com.intellij.platform.ijent.IjentApi].
-   */
-  @Deprecated("API should avoid exposing coroutine scopes")
-  val coroutineScope: CoroutineScope
 
   /**
-   * The same as the user from [com.intellij.platform.ijent.IjentApi.info].
+   * The same as the user from [com.intellij.platform.eel.IjentApi.info].
    *
    * There's a duplication of methods because [user] is required for checking file permissions correctly, but also it can be required
    * in other cases outside the filesystem.
@@ -50,7 +48,7 @@ sealed interface IjentFileSystemApi {
   @Throws(IjentUnavailableException::class)
   suspend fun listDirectoryWithAttrs(
     path: IjentPath.Absolute,
-    resolveSymlinks: Boolean = true,
+    symlinkPolicy: SymlinkPolicy,
   ): IjentFsResult<
     out Collection<Pair<String, IjentFileInfo>>,
     ListDirectoryError>
@@ -83,7 +81,29 @@ sealed interface IjentFileSystemApi {
    * Similar to stat(2) and lstat(2). [resolveSymlinks] has an impact only on [IjentFileInfo.fileType] if [path] points on a symlink.
    */
   @Throws(IjentUnavailableException::class)
-  suspend fun stat(path: IjentPath.Absolute, resolveSymlinks: Boolean): IjentFsResult<out IjentFileInfo, StatError>
+  suspend fun stat(path: IjentPath.Absolute, symlinkPolicy: SymlinkPolicy): IjentFsResult<out IjentFileInfo, StatError>
+
+  /**
+   * Defines the behavior of FS operations on symbolic links
+   */
+  enum class SymlinkPolicy {
+    /**
+     * Leaves symlinks unresolved.
+     * This option makes the operation a bit more efficient if it is not interested in symlinks.
+     */
+    DO_NOT_RESOLVE,
+
+    /**
+     * Resolves a symlink and returns the information about the target of the symlink,
+     * But does not perform anything on the target of the symlink itself.
+     */
+    JUST_RESOLVE,
+
+    /**
+     * Resolves a symlink, follows it, and performs the required operation on target.
+     */
+    RESOLVE_AND_FOLLOW,
+  }
 
   sealed interface StatError : IjentFsError {
     interface DoesNotExist : StatError, IjentFsError.DoesNotExist
@@ -180,7 +200,7 @@ sealed interface IjentFileSystemApi {
 
 
   @Throws(DeleteException::class, IjentUnavailableException::class)
-  suspend fun delete(path: IjentPath.Absolute, removeContent: Boolean, followLinks: Boolean)
+  suspend fun delete(path: IjentPath.Absolute, removeContent: Boolean)
 
   sealed class DeleteException(
     where: IjentPath.Absolute,
@@ -299,6 +319,14 @@ sealed interface IjentOpenedFile {
   enum class SeekWhence {
     START, CURRENT, END,
   }
+
+  /**
+   * Similar to `fstat(2)`.
+   *
+   * Sometimes, the files are inaccessible via [IjentFileSystemApi.stat] -- for example, if they are deleted.
+   * In this case, one can get the information about the opened file with the use of this function.
+   */
+  suspend fun stat(): IjentFsResult<IjentFileInfo, StatError>
 
 
   interface Reader : IjentOpenedFile {
@@ -428,15 +456,62 @@ interface IjentFileSystemPosixApi : IjentFileSystemApi {
   @Throws(IjentUnavailableException::class)
   override suspend fun listDirectoryWithAttrs(
     path: IjentPath.Absolute,
-    resolveSymlinks: Boolean,
+    symlinkPolicy: IjentFileSystemApi.SymlinkPolicy,
   ): IjentFsResult<
     Collection<Pair<String, IjentPosixFileInfo>>,
     IjentFileSystemApi.ListDirectoryError>
 
   @Throws(IjentUnavailableException::class)
-  override suspend fun stat(path: IjentPath.Absolute, resolveSymlinks: Boolean): IjentFsResult<
+  override suspend fun stat(path: IjentPath.Absolute, symlinkPolicy: IjentFileSystemApi.SymlinkPolicy): IjentFsResult<
     IjentPosixFileInfo,
     IjentFileSystemApi.StatError>
+
+
+  /**
+   * Notice that the first argument is the target of the symlink,
+   * like in `ln -s` tool, like in `symlink(2)` from LibC, but opposite to `java.nio.file.spi.FileSystemProvider.createSymbolicLink`.
+   */
+  @Throws(CreateSymbolicLinkException::class, IjentUnavailableException::class)
+  suspend fun createSymbolicLink(target: IjentPath, linkPath: IjentPath.Absolute)
+
+  sealed class CreateSymbolicLinkException(
+    where: IjentPath.Absolute,
+    additionalMessage: @NlsSafe String,
+  ) : IjentFsIOException(where, additionalMessage) {
+    /**
+     * Example: `createSymbolicLink("anywhere", "/directory_that_does_not_exist")`
+     */
+    class DoesNotExist(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateSymbolicLinkException(where, additionalMessage), IjentFsError.DoesNotExist
+
+    /**
+     * Examples:
+     * * `createSymbolicLink("anywhere", "/etc/passwd")`
+     * * `createSymbolicLink("anywhere", "/home")`
+     */
+    class FileAlreadyExists(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateSymbolicLinkException(where, additionalMessage), IjentFsError.AlreadyExists
+
+    /**
+     * Example: `createSymbolicLink("anywhere", "/etc/passwd/oops")`
+     */
+    class NotDirectory(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateSymbolicLinkException(where, additionalMessage), IjentFsError.NotDirectory
+
+    /**
+     * Example:
+     * * With non-root permissions: `createSymbolicLink("anywhere", "/root/oops")`
+     */
+    class PermissionDenied(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateSymbolicLinkException(where, additionalMessage), IjentFsError.PermissionDenied
+
+    /**
+     * Everything else, including `ELOOP`.
+     * Despite an allegedly related name, the errno `ELOOP` has nothing to do with symlinks creation,
+     * and it can appear only in this case:
+     * ```
+     * createSymbolicLink("/tmp/foobar", "/tmp/foobar") // OK
+     * createSymbolicLink("anywhere", "/tmp/foobar/oops") // Other("something about ELOOP")
+     * ```
+     */
+    class Other(where: IjentPath.Absolute, additionalMessage: @NlsSafe String) : CreateSymbolicLinkException(where, additionalMessage), IjentFsError.Other
+  }
 }
 
 interface IjentFileSystemWindowsApi : IjentFileSystemApi {
@@ -448,13 +523,13 @@ interface IjentFileSystemWindowsApi : IjentFileSystemApi {
   @Throws(IjentUnavailableException::class)
   override suspend fun listDirectoryWithAttrs(
     path: IjentPath.Absolute,
-    resolveSymlinks: Boolean,
+    symlinkPolicy: IjentFileSystemApi.SymlinkPolicy,
   ): IjentFsResult<
     Collection<Pair<String, IjentWindowsFileInfo>>,
     IjentFileSystemApi.ListDirectoryError>
 
   @Throws(IjentUnavailableException::class)
-  override suspend fun stat(path: IjentPath.Absolute, resolveSymlinks: Boolean): IjentFsResult<
+  override suspend fun stat(path: IjentPath.Absolute, symlinkPolicy: IjentFileSystemApi.SymlinkPolicy): IjentFsResult<
     IjentWindowsFileInfo,
     IjentFileSystemApi.StatError>
 }

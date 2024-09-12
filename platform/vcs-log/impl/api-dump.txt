@@ -1507,7 +1507,7 @@ f:com.intellij.vcs.log.ui.frame.VcsLogChangesBrowser
 - f:setToolbarHeightReferent(javax.swing.JComponent):V
 - uiDataSnapshot(com.intellij.openapi.actionSystem.DataSink):V
 f:com.intellij.vcs.log.ui.frame.VcsLogChangesBrowser$Companion
-- f:createDiffRequestProducer(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.changes.Change,java.util.Map,Z):com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain$Producer
+- f:createDiffRequestProducer(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.changes.Change,java.util.Map):com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain$Producer
 com.intellij.vcs.log.ui.frame.VcsLogChangesBrowser$Listener
 - java.util.EventListener
 - a:onModelUpdated():V
@@ -1604,6 +1604,7 @@ f:com.intellij.vcs.log.ui.table.GraphTableModel
 - getRefsAtRow(I):java.util.List
 - getRootAtRow(I):com.intellij.openapi.vfs.VirtualFile
 - getRowCount():I
+- getRowInfo(I):com.intellij.vcs.log.graph.RowInfo
 - getValueAt(I,I):java.lang.Object
 - getValueAt(I,com.intellij.vcs.log.ui.table.column.VcsLogColumn):java.lang.Object
 - getVisiblePack():com.intellij.vcs.log.visible.VisiblePack
@@ -1688,13 +1689,13 @@ c:com.intellij.vcs.log.ui.table.VcsLogGraphTable
 - addHighlighter(com.intellij.vcs.log.VcsLogHighlighter):V
 - p:appendActionToEmptyText(java.lang.String,java.lang.Runnable):V
 - applyHighlighters(java.awt.Component,I,I,Z,Z):com.intellij.ui.SimpleTextAttributes
+- changeSelection(I,I,Z,Z):V
 - dispose():V
 - doLayout():V
 - forceReLayout(com.intellij.vcs.log.ui.table.column.VcsLogColumn):V
 - getActionUpdateThread():com.intellij.openapi.actionSystem.ActionUpdateThread
 - getAutoCreateColumnsFromModel():Z
 - getBaseStyle(I,I,Z,Z):com.intellij.vcs.log.VcsLogHighlighter$VcsCommitStyle
-- getCellEditor():javax.swing.table.TableCellEditor
 - getColorManager():com.intellij.vcs.log.ui.VcsLogColorManager
 - f:getColumnViewIndex(com.intellij.vcs.log.ui.table.column.VcsLogColumn):I
 - getCommitColumn():javax.swing.table.TableColumn

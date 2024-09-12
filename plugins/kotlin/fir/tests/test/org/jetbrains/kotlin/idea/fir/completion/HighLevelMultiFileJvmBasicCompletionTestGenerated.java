@@ -55,6 +55,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
         runTest("../../completion/testData/basic/multifile/ClassInExcludedPackage/");
     }
 
+    @TestMetadata("ClassInRootPackage")
+    public void testClassInRootPackage() throws Exception {
+        runTest("../../completion/testData/basic/multifile/ClassInRootPackage/");
+    }
+
     @TestMetadata("CompleteFunctionWithNoSpecifiedType")
     public void testCompleteFunctionWithNoSpecifiedType() throws Exception {
         runTest("../../completion/testData/basic/multifile/CompleteFunctionWithNoSpecifiedType/");
@@ -188,6 +193,11 @@ public class HighLevelMultiFileJvmBasicCompletionTestGenerated extends AbstractH
     @TestMetadata("InImportCompanionObjectMembers")
     public void testInImportCompanionObjectMembers() throws Exception {
         runTest("../../completion/testData/basic/multifile/InImportCompanionObjectMembers/");
+    }
+
+    @TestMetadata("InImportEscaped")
+    public void testInImportEscaped() throws Exception {
+        runTest("../../completion/testData/basic/multifile/InImportEscaped/");
     }
 
     @TestMetadata("InImportExtension")

@@ -39,8 +39,6 @@ import com.intellij.platform.diagnostic.telemetry.IJTracer;
 import com.intellij.platform.diagnostic.telemetry.PlatformScopesKt;
 import com.intellij.platform.diagnostic.telemetry.TelemetryManager;
 import com.intellij.platform.diagnostic.telemetry.helpers.TraceKt;
-import com.intellij.platform.diagnostic.telemetry.helpers.TraceUtil;
-import com.intellij.platform.ide.bootstrap.StartupUtil;
 import com.intellij.psi.util.ReadActionCache;
 import com.intellij.ui.ComponentUtil;
 import com.intellij.util.*;
@@ -66,7 +64,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.intellij.ide.ShutdownKt.cancelAndJoinBlocking;
-import static com.intellij.openapi.application.RuntimeFlagsKt.isNewLockEnabled;
 import static com.intellij.util.concurrency.AppExecutorUtil.propagateContext;
 
 @ApiStatus.Internal
@@ -74,9 +71,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
   private static @NotNull Logger getLogger() {
     return Logger.getInstance(ApplicationImpl.class);
   }
-
-  private final static boolean isNewLockEnabled = isNewLockEnabled();
-  private ReadMostlyRWLock myLock;
 
   /** @deprecated see {@link ModalityInvokator} notice */
   @Deprecated
@@ -122,7 +116,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     super(GlobalScope.INSTANCE);
 
     Extensions.setRootArea(getExtensionArea());
-    myLock = RwLockHolder.lock;
 
     registerFakeServices(this);
 
@@ -273,17 +266,12 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public void invokeLater(@NotNull Runnable runnable, @NotNull ModalityState state, @NotNull Condition<?> expired) {
-    if (!isNewLockEnabled && myLock == null) {
-      getLogger().error("Do not call invokeLater when app is not yet fully initialized");
-    }
-
     if (propagateContext()) {
       Pair<Runnable, Condition<?>> captured = Propagation.capturePropagationContext(runnable, expired);
       runnable = captured.getFirst();
       expired = captured.getSecond();
     }
     Runnable r = myTransactionGuard.wrapLaterInvocation(runnable, state);
-    // Don't need to enable implicit read, as Write Intent lock includes Explicit Read
     LaterInvocator.invokeLater(state, expired, wrapWithRunIntendedWriteAction(r));
   }
 
@@ -313,7 +301,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     }
 
     // Remove IW lock from EDT as EDT might be re-created, which might lead to deadlock if anybody uses this disposed app
-    if (!StartupUtil.isImplicitReadOnEDTDisabled() || isUnitTestMode()) {
+    if (isUnitTestMode()) {
       invokeLater(() -> releaseWriteIntentLock(), ModalityState.nonModal());
     }
 
@@ -826,7 +814,7 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @ApiStatus.Internal
   public boolean isCurrentWriteOnEdt() {
-    return !isNewLockEnabled && EDT.isEdt(myLock.writeThread);
+    return false;
   }
 
   @Override
@@ -1088,26 +1076,21 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @Override
   public String toString() {
-    boolean hasLock = myLock != null;
-    boolean writeActionPending = hasLock && isWriteActionPending();
-    boolean writeActionInProgress = hasLock && isWriteActionInProgress();
-    boolean writeAccessAllowed = hasLock && isWriteAccessAllowed();
+    boolean writeActionPending = isWriteActionPending();
+    boolean writeActionInProgress = isWriteActionInProgress();
+    boolean writeAccessAllowed =isWriteAccessAllowed();
     return "Application"
            + (getContainerState().get() == ContainerState.COMPONENT_CREATED ? "" : " (containerState " + getContainerStateName() + ") ")
            + (isUnitTestMode() ? " (unit test)" : "")
            + (isInternal() ? " (internal)" : "")
            + (isHeadlessEnvironment() ? " (headless)" : "")
            + (isCommandLine() ? " (command line)" : "")
-           + (hasLock ?
-              (writeActionPending || writeActionInProgress || writeAccessAllowed ? " (WA" +
+           + (writeActionPending || writeActionInProgress || writeAccessAllowed ? " (WA" +
                                                                                    (writeActionPending ? " pending" : "") +
                                                                                    (writeActionInProgress ? " inProgress" : "") +
                                                                                    (writeAccessAllowed ? " allowed" : "") +
                                                                                    ")" : "")
-                      : " (lock is not ready)"
-           )
            + (isReadAccessAllowed() ? " (RA allowed)" : "")
-           + (StartupUtil.isImplicitReadOnEDTDisabled() ? " (IR on EDT disabled)" : "")
            + (isInImpatientReader() ? " (impatient reader)" : "")
            + (isExitInProgress() ? " (exit in progress)" : "")
       ;
@@ -1150,19 +1133,8 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
     return getContainerState().get().compareTo(ContainerState.COMPONENT_CREATED) >= 0;
   }
 
-  @Override
-  public void runWithoutImplicitRead(@NotNull Runnable runnable) {
-    getThreadingSupport().runWithoutImplicitRead(runnable);
-  }
-
-  @Override
-  public void runWithImplicitRead(@NotNull Runnable runnable) {
-    getThreadingSupport().runWithImplicitRead(runnable);
-  }
-
   @ApiStatus.Internal
   public static void postInit(@NotNull ApplicationImpl app) {
-    app.myLock = RwLockHolder.lock;
     AtomicBoolean reported = new AtomicBoolean();
     IdeEventQueue.getInstance().addPostprocessor(e -> {
       if (app.isWriteAccessAllowed() && reported.compareAndSet(false, true)) {
@@ -1218,6 +1190,6 @@ public final class ApplicationImpl extends ClientAwareComponentManager implement
 
   @NotNull
   private static ThreadingSupport getThreadingSupport() {
-    return isNewLockEnabled ? AnyThreadWriteThreadingSupport.INSTANCE : RwLockHolder.INSTANCE;
+    return AnyThreadWriteThreadingSupport.INSTANCE;
   }
 }

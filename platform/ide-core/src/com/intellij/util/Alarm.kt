@@ -4,8 +4,8 @@
 
 package com.intellij.util
 
-import com.intellij.codeWithMe.ClientId
-import com.intellij.codeWithMe.asContextElement
+import com.intellij.codeWithMe.clientIdContextElement
+import com.intellij.concurrency.currentThreadContext
 import com.intellij.diagnostic.PluginException
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.*
@@ -371,7 +371,7 @@ open class Alarm @Internal constructor(
   ) {
     @JvmField
     var job: Job? = null // guarded by LOCK
-    private val clientIdContext = ClientId.currentOrNull?.asContextElement()
+    private val clientIdContext = currentThreadContext().clientIdContextElement
 
     fun schedule(owner: Alarm) {
       assert(job == null)
@@ -397,8 +397,16 @@ open class Alarm @Internal constructor(
 
           //todo fix clients and remove NonCancellable
           try {
-            Cancellation.withNonCancelableSection().use {
-              task.run()
+            if (owner.threadToUse == ThreadToUse.SWING_THREAD) {
+              Cancellation.withNonCancelableSection().use {
+                //todo fix clients and remove WriteIntentReadAction
+                WriteIntentReadAction.run(task)
+              }
+            }
+            else {
+              Cancellation.withNonCancelableSection().use {
+                task.run()
+              }
             }
           }
           catch (e: CancellationException) {

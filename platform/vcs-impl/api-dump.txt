@@ -1022,13 +1022,16 @@ f:com.intellij.openapi.vcs.changes.ChangeListData
 - <init>():V
 - <init>(com.intellij.vcs.log.VcsUser):V
 - <init>(com.intellij.vcs.log.VcsUser,java.util.Date):V
-- b:<init>(com.intellij.vcs.log.VcsUser,java.util.Date,I,kotlin.jvm.internal.DefaultConstructorMarker):V
+- <init>(com.intellij.vcs.log.VcsUser,java.util.Date,Z):V
+- b:<init>(com.intellij.vcs.log.VcsUser,java.util.Date,Z,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:component1():com.intellij.vcs.log.VcsUser
 - f:component2():java.util.Date
-- f:copy(com.intellij.vcs.log.VcsUser,java.util.Date):com.intellij.openapi.vcs.changes.ChangeListData
-- bs:copy$default(com.intellij.openapi.vcs.changes.ChangeListData,com.intellij.vcs.log.VcsUser,java.util.Date,I,java.lang.Object):com.intellij.openapi.vcs.changes.ChangeListData
+- f:component3():Z
+- f:copy(com.intellij.vcs.log.VcsUser,java.util.Date,Z):com.intellij.openapi.vcs.changes.ChangeListData
+- bs:copy$default(com.intellij.openapi.vcs.changes.ChangeListData,com.intellij.vcs.log.VcsUser,java.util.Date,Z,I,java.lang.Object):com.intellij.openapi.vcs.changes.ChangeListData
 - equals(java.lang.Object):Z
 - f:getAuthor():com.intellij.vcs.log.VcsUser
+- f:getAutomatic():Z
 - f:getDate():java.util.Date
 - f:getPresentation():java.lang.String
 - hashCode():I
@@ -1039,18 +1042,6 @@ f:com.intellij.openapi.vcs.changes.ChangeListData$Companion
 - f:of(com.intellij.vcs.log.VcsUser,java.util.Date):com.intellij.openapi.vcs.changes.ChangeListData
 - f:readExternal(org.jdom.Element):com.intellij.openapi.vcs.changes.ChangeListData
 - f:writeExternal(com.intellij.openapi.vcs.changes.ChangeListData):org.jdom.Element
-f:com.intellij.openapi.vcs.changes.ChangeListData$State
-- <init>():V
-- <init>(java.lang.String):V
-- <init>(java.lang.String,java.lang.String):V
-- <init>(java.lang.String,java.lang.String,java.util.Date):V
-- b:<init>(java.lang.String,java.lang.String,java.util.Date,I,kotlin.jvm.internal.DefaultConstructorMarker):V
-- f:getDate():java.util.Date
-- f:getEmail():java.lang.String
-- f:getName():java.lang.String
-- f:setDate(java.util.Date):V
-- f:setEmail(java.lang.String):V
-- f:setName(java.lang.String):V
 f:com.intellij.openapi.vcs.changes.ChangeListDataKt
 - sf:getAuthor(com.intellij.openapi.vcs.changes.LocalChangeList):com.intellij.vcs.log.VcsUser
 - sf:getAuthorDate(com.intellij.openapi.vcs.changes.LocalChangeList):java.util.Date
@@ -1428,11 +1419,6 @@ c:com.intellij.openapi.vcs.changes.DefaultChangeListOwner
 - addUnversionedFiles(com.intellij.openapi.vcs.changes.LocalChangeList,java.util.List):V
 - getProject():com.intellij.openapi.project.Project
 - moveChangesTo(com.intellij.openapi.vcs.changes.LocalChangeList,java.util.List):V
-a:com.intellij.openapi.vcs.changes.DefaultDiffEditorTabFilesListener
-- com.intellij.openapi.vcs.changes.VcsEditorTabFilesListener
-- <init>():V
-- a:shouldOpenInNewWindowChanged(com.intellij.diff.editor.DiffContentVirtualFile,Z):V
-- f:shouldOpenInNewWindowChanged(com.intellij.openapi.vfs.VirtualFile,Z):V
 c:com.intellij.openapi.vcs.changes.DeletedFilesHolder
 - com.intellij.openapi.vcs.changes.FileHolder
 - <init>():V
@@ -1445,21 +1431,6 @@ c:com.intellij.openapi.vcs.changes.DeletedFilesHolder
 - hashCode():I
 - isContainedInLocallyDeleted(com.intellij.openapi.vcs.FilePath):Z
 - takeFrom(com.intellij.openapi.vcs.changes.DeletedFilesHolder):V
-f:com.intellij.openapi.vcs.changes.DiffEditorTabStateListener
-- com.intellij.openapi.vcs.changes.DefaultDiffEditorTabFilesListener
-- <init>():V
-- shouldOpenInNewWindowChanged(com.intellij.diff.editor.DiffContentVirtualFile,Z):V
-com.intellij.openapi.vcs.changes.DiffPreview
-- sf:Companion:com.intellij.openapi.vcs.changes.DiffPreview$Companion
-- a:closePreview():V
-- s:closePreviewFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):V
-- a:openPreview(Z):Z
-- performDiffAction():Z
-- s:setPreviewVisible(com.intellij.openapi.vcs.changes.DiffPreview,Z):V
-- updateDiffAction(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.vcs.changes.DiffPreview$Companion
-- f:closePreviewFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):V
-- f:setPreviewVisible(com.intellij.openapi.vcs.changes.DiffPreview,Z):V
 com.intellij.openapi.vcs.changes.DiffPreviewProvider
 - a:createDiffRequestProcessor():com.intellij.diff.impl.DiffRequestProcessor
 - a:getEditorTabName(com.intellij.diff.impl.DiffRequestProcessor):java.lang.String
@@ -1478,37 +1449,12 @@ a:com.intellij.openapi.vcs.changes.DnDActivateOnHoldTarget
 - drop(com.intellij.ide.dnd.DnDEvent):V
 - a:isDropPossible(com.intellij.ide.dnd.DnDEvent):Z
 - update(com.intellij.ide.dnd.DnDEvent):Z
-a:com.intellij.openapi.vcs.changes.EditorTabDiffPreview
-- com.intellij.openapi.util.CheckedDisposable
-- com.intellij.openapi.vcs.changes.DiffPreview
-- <init>(com.intellij.openapi.project.Project):V
-- closePreview():V
-- pa:collectDiffProducers(Z):com.intellij.openapi.ListSelection
-- createEscapeHandler():com.intellij.openapi.actionSystem.AnAction
-- pa:createViewer():com.intellij.diff.impl.DiffEditorViewer
-- dispose():V
-- pa:getEditorTabName(com.intellij.diff.impl.DiffEditorViewer):java.lang.String
-- f:getPreviewFile():com.intellij.openapi.vfs.VirtualFile
-- f:getProject():com.intellij.openapi.project.Project
-- p:handleEscapeKey():V
-- a:hasContent():Z
-- isDisposed():Z
-- f:isPreviewOpen():Z
-- openPreview(Z):Z
-- performDiffAction():Z
-- updateDiffAction(com.intellij.openapi.actionSystem.AnActionEvent):V
-f:com.intellij.openapi.vcs.changes.EditorTabDiffPreviewKt
-- sf:showExternalToolIfNeeded(com.intellij.openapi.project.Project,com.intellij.openapi.ListSelection):Z
 f:com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager
-- com.intellij.diff.editor.DiffEditorTabFilesManager
 - sf:Companion:com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager$Companion
 - sf:EDITOR_TAB_DIFF_PREVIEW:com.intellij.openapi.actionSystem.DataKey
 - <init>(com.intellij.openapi.project.Project):V
-- sf:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager
-- showDiffFile(com.intellij.openapi.vfs.VirtualFile,Z):com.intellij.openapi.fileEditor.FileEditor[]
 - f:subscribeToPreviewVisibilityChange(com.intellij.openapi.Disposable,java.lang.Runnable):V
 f:com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager$Companion
-- f:getInstance(com.intellij.openapi.project.Project):com.intellij.openapi.vcs.changes.EditorTabDiffPreviewManager
 a:com.intellij.openapi.vcs.changes.EditorTabPreview
 - com.intellij.openapi.vcs.changes.EditorTabPreviewBase
 - <init>(com.intellij.diff.impl.DiffRequestProcessor):V
@@ -1812,13 +1758,11 @@ f:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 - sf:Companion:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager$Companion
 - <init>():V
 - dispose():V
-- sf:findFloatingWindowForFile(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWindow
 - sf:getInstance():com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 - f:getShouldOpenInNewWindow():Z
 - f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z):java.util.List
 - f:openFile(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile,Z,Z,Z):java.util.List
 f:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager$Companion
-- f:findFloatingWindowForFile(com.intellij.openapi.fileEditor.ex.FileEditorManagerEx,com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.fileEditor.impl.EditorWindow
 - f:getInstance():com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager
 f:com.intellij.openapi.vcs.changes.VcsEditorTabFilesManager$State
 - com.intellij.openapi.components.BaseState
@@ -2157,6 +2101,7 @@ f:com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer
 - getProject():com.intellij.openapi.project.Project
 - s:getRequestTitle(com.intellij.openapi.vcs.changes.Change):java.lang.String
 - s:getRevisionTitle(com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String):java.lang.String
+- s:getRevisionTitleOrEmpty(com.intellij.openapi.vcs.changes.ContentRevision):java.lang.String
 - s:getServerVersion():java.lang.String
 - getTag():com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode$Tag
 - s:getYourVersion():java.lang.String
@@ -4802,6 +4747,7 @@ f:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 - f:initLazyContent(com.intellij.ui.content.Content):V
 - sf:isCommitToolWindowShown(com.intellij.openapi.project.Project):Z
 - f:isContentSelected(java.lang.String):Z
+- sf:isToolWindowTabVertical(com.intellij.openapi.project.Project,java.lang.String):Z
 - removeContent(com.intellij.ui.content.Content):V
 - selectContent(java.lang.String):V
 - f:selectContent(java.lang.String,Z):V
@@ -4813,6 +4759,7 @@ f:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$Companion
 - f:getToolWindowFor(com.intellij.openapi.project.Project,java.lang.String):com.intellij.openapi.wm.ToolWindow
 - f:getToolWindowIdFor(com.intellij.openapi.project.Project,java.lang.String):java.lang.String
 - f:isCommitToolWindowShown(com.intellij.openapi.project.Project):Z
+- f:isToolWindowTabVertical(com.intellij.openapi.project.Project,java.lang.String):Z
 e:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - java.lang.Enum
 - sf:BRANCHES:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
@@ -4829,6 +4776,8 @@ e:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - f:getWeight():I
 - s:valueOf(java.lang.String):com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight
 - s:values():com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager$TabOrderWeight[]
+f:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManagerKt
+- sf:subscribeOnVcsToolWindowLayoutChanges(com.intellij.util.messages.MessageBusConnection,java.lang.Runnable):V
 com.intellij.openapi.vcs.changes.ui.ChangesViewContentManagerListener
 - sf:Companion:com.intellij.openapi.vcs.changes.ui.ChangesViewContentManagerListener$Companion
 - sf:TOPIC:com.intellij.util.messages.Topic
@@ -5641,6 +5590,7 @@ f:com.intellij.openapi.vcs.configurable.CommitDialogConfigurable
 - <init>(com.intellij.openapi.project.Project):V
 - createConfigurables():java.util.List
 - createPanel():com.intellij.openapi.ui.DialogPanel
+- disposeUIResources():V
 f:com.intellij.openapi.vcs.configurable.CommitDialogConfigurable$Companion
 c:com.intellij.openapi.vcs.configurable.IssueLinkConfigurationDialog
 - com.intellij.openapi.ui.DialogWrapper
@@ -5691,6 +5641,9 @@ c:com.intellij.openapi.vcs.configurable.ShelfStorageConfigurationDialog
 - p:doValidate():com.intellij.openapi.ui.ValidationInfo
 - p:getHelpId():java.lang.String
 - p:postponeValidation():Z
+f:com.intellij.openapi.vcs.configurable.SuggestedVcsComparator
+- sf:INSTANCE:com.intellij.openapi.vcs.configurable.SuggestedVcsComparator
+- sf:create(com.intellij.openapi.project.Project):java.util.Comparator
 a:com.intellij.openapi.vcs.configurable.VcsCheckBoxWithSpinnerConfigurable
 - com.intellij.openapi.options.Configurable
 - p:myHighlightInterval:javax.swing.JSpinner
@@ -5724,6 +5677,7 @@ f:com.intellij.openapi.vcs.configurable.VcsGeneralSettingsConfigurable
 - <init>(com.intellij.openapi.project.Project):V
 - createConfigurables():java.util.List
 - createPanel():com.intellij.openapi.ui.DialogPanel
+- disposeUIResources():V
 - getDependencies():java.util.List
 - f:getProject():com.intellij.openapi.project.Project
 f:com.intellij.openapi.vcs.configurable.VcsManagerConfigurable
@@ -5986,6 +5940,25 @@ pa:com.intellij.openapi.vcs.history.BaseDiffFromHistoryHandler$CollectChangesTas
 - a:getDialogTitle():java.lang.String
 - onSuccess():V
 - run(com.intellij.openapi.progress.ProgressIndicator):V
+f:com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer
+- sf:INSTANCE:com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer
+- sf:getTitleCustomizers(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle,com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle):java.util.List
+- sf:getTitleCustomizers(com.intellij.openapi.project.Project,com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle,com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle,com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle):java.util.List
+- sf:getTitleCustomizers(java.lang.String,java.lang.String):java.util.List
+f:com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle
+- sf:Companion:com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle$Companion
+- <init>(com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String):V
+- f:component1():com.intellij.openapi.vcs.changes.ContentRevision
+- f:component2():java.lang.String
+- f:copy(com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String):com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle
+- bs:copy$default(com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle,com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String,I,java.lang.Object):com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle
+- sf:create(com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String):com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle
+- equals(java.lang.Object):Z
+- f:getRevision():com.intellij.openapi.vcs.changes.ContentRevision
+- f:getTitle():java.lang.String
+- hashCode():I
+f:com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle$Companion
+- f:create(com.intellij.openapi.vcs.changes.ContentRevision,java.lang.String):com.intellij.openapi.vcs.history.DiffTitleFilePathCustomizer$RevisionWithTitle
 f:com.intellij.openapi.vcs.history.FileHistoryPanelImpl
 - javax.swing.JPanel
 - com.intellij.ide.CopyProvider
@@ -6353,6 +6326,7 @@ f:com.intellij.openapi.vcs.impl.LineStatusTrackerManager
 - getLineStatusTracker(com.intellij.openapi.editor.Document):com.intellij.openapi.vcs.ex.LineStatusTracker
 - getLineStatusTracker(com.intellij.openapi.vfs.VirtualFile):com.intellij.openapi.vcs.ex.LineStatusTracker
 - f:getTrackers():java.util.List
+- f:hasPendingUpdate(com.intellij.openapi.editor.Document):Z
 - invokeAfterUpdate(java.lang.Runnable):V
 - f:releaseAllTrackers():V
 - releaseTrackerFor(com.intellij.openapi.editor.Document,java.lang.Object):V
@@ -7829,15 +7803,17 @@ e:com.intellij.vcs.commit.CommitOption
 - s:values():com.intellij.vcs.commit.CommitOption[]
 com.intellij.vcs.commit.CommitOptions
 - a:getAfterOptions():java.util.List
-- a:getBeforeOptions():java.util.List
+- a:getBeforeCommitChecksOptions():java.util.List
 - a:getExtensionOptions():java.util.List
+- a:getPostCommitChecksOptions():java.util.List
 - a:getVcsOptions():java.util.Map
 f:com.intellij.vcs.commit.CommitOptionsImpl
 - com.intellij.vcs.commit.CommitOptions
-- <init>(java.util.Map,java.util.List,java.util.List,java.util.List):V
+- <init>(java.util.Map,java.util.List,java.util.List,java.util.List,java.util.List):V
 - getAfterOptions():java.util.List
-- getBeforeOptions():java.util.List
+- getBeforeCommitChecksOptions():java.util.List
 - getExtensionOptions():java.util.List
+- getPostCommitChecksOptions():java.util.List
 - getVcsOptions():java.util.Map
 f:com.intellij.vcs.commit.CommitOptionsKt
 - sf:getAllOptions(com.intellij.vcs.commit.CommitOptions):kotlin.sequences.Sequence
@@ -7852,6 +7828,7 @@ f:com.intellij.vcs.commit.CommitOptionsPanel
 - setVisible(java.util.Collection):V
 f:com.intellij.vcs.commit.CommitOptionsPanel$Companion
 - f:commitChecksGroupTitle(java.lang.String):java.lang.String
+- f:postCommitChecksGroupTitle(java.lang.String):java.lang.String
 com.intellij.vcs.commit.CommitOptionsUi
 - a:setOptions(com.intellij.vcs.commit.CommitOptions):V
 - a:setVisible(java.util.Collection):V
@@ -8079,8 +8056,9 @@ f:com.intellij.vcs.commit.MutableCommitOptions
 - f:add(com.intellij.vcs.commit.CommitOptions):V
 - f:clear():V
 - getAfterOptions():java.util.List
-- getBeforeOptions():java.util.List
+- getBeforeCommitChecksOptions():java.util.List
 - getExtensionOptions():java.util.List
+- getPostCommitChecksOptions():java.util.List
 - getVcsOptions():java.util.Map
 - f:toUnmodifiableOptions():com.intellij.vcs.commit.CommitOptionsImpl
 f:com.intellij.vcs.commit.NonModalAmendCommitHandler

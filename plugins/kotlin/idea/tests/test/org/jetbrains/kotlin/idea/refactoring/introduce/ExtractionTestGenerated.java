@@ -2749,6 +2749,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                     runTest("testData/refactoring/extractFunction/parameters/extractThis/missingReceiver.kt");
                 }
 
+                @TestMetadata("nestedReceivers.kt")
+                public void testNestedReceivers() throws Exception {
+                    runTest("testData/refactoring/extractFunction/parameters/extractThis/nestedReceivers.kt");
+                }
+
                 @TestMetadata("paramAsExplicitInvoke.kt")
                 public void testParamAsExplicitInvoke() throws Exception {
                     runTest("testData/refactoring/extractFunction/parameters/extractThis/paramAsExplicitInvoke.kt");
@@ -3990,6 +3995,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/introduceParameter/inDefaultValue.kt");
             }
 
+            @TestMetadata("invalidationOnSubstitution.kt")
+            public void testInvalidationOnSubstitution() throws Exception {
+                runTest("testData/refactoring/introduceParameter/invalidationOnSubstitution.kt");
+            }
+
             @TestMetadata("lambdaArgument.kt")
             public void testLambdaArgument() throws Exception {
                 runTest("testData/refactoring/introduceParameter/lambdaArgument.kt");
@@ -4038,6 +4048,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("quotedName.kt")
             public void testQuotedName() throws Exception {
                 runTest("testData/refactoring/introduceParameter/quotedName.kt");
+            }
+
+            @TestMetadata("receiverUsageEliminated.kt")
+            public void testReceiverUsageEliminated() throws Exception {
+                runTest("testData/refactoring/introduceParameter/receiverUsageEliminated.kt");
             }
 
             @TestMetadata("resultedType.kt")
@@ -4125,6 +4140,16 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
                 runTest("testData/refactoring/introduceParameter/superCallArgument.kt");
             }
 
+            @TestMetadata("superFunctionWithDeleteUnusedParameter.kt")
+            public void testSuperFunctionWithDeleteUnusedParameter() throws Exception {
+                runTest("testData/refactoring/introduceParameter/superFunctionWithDeleteUnusedParameter.kt");
+            }
+
+            @TestMetadata("thisSubstitution.kt")
+            public void testThisSubstitution() throws Exception {
+                runTest("testData/refactoring/introduceParameter/thisSubstitution.kt");
+            }
+
             @TestMetadata("throw.kt")
             public void testThrow() throws Exception {
                 runTest("testData/refactoring/introduceParameter/throw.kt");
@@ -4158,6 +4183,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("while.kt")
             public void testWhile() throws Exception {
                 runTest("testData/refactoring/introduceParameter/while.kt");
+            }
+
+            @TestMetadata("withJavaSuper.kt")
+            public void testWithJavaSuper() throws Exception {
+                runTest("testData/refactoring/introduceParameter/withJavaSuper.kt");
             }
         }
 
@@ -4368,6 +4398,11 @@ public abstract class ExtractionTestGenerated extends AbstractExtractionTest {
             @TestMetadata("lambdaParamOfUnit.kt")
             public void testLambdaParamOfUnit() throws Exception {
                 runTest("testData/refactoring/introduceLambdaParameter/lambdaParamOfUnit.kt");
+            }
+
+            @TestMetadata("lambdaParamWithClsSuper.kt")
+            public void testLambdaParamWithClsSuper() throws Exception {
+                runTest("testData/refactoring/introduceLambdaParameter/lambdaParamWithClsSuper.kt");
             }
 
             @TestMetadata("lambdaParamWithDefaultValue.kt")

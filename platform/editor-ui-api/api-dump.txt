@@ -1158,6 +1158,21 @@ com.intellij.openapi.actionSystem.ActionToolbar
 com.intellij.openapi.actionSystem.ActionToolbarListener
 - java.util.EventListener
 - actionsUpdated():V
+com.intellij.openapi.actionSystem.ActionUiKind
+- sf:Companion:com.intellij.openapi.actionSystem.ActionUiKind$Companion
+- sf:MAIN_MENU:com.intellij.openapi.actionSystem.ActionUiKind$Popup
+- sf:NONE:com.intellij.openapi.actionSystem.ActionUiKind
+- sf:POPUP:com.intellij.openapi.actionSystem.ActionUiKind$Popup
+- sf:SEARCH_POPUP:com.intellij.openapi.actionSystem.ActionUiKind$Popup
+- sf:TOOLBAR:com.intellij.openapi.actionSystem.ActionUiKind$Toolbar
+f:com.intellij.openapi.actionSystem.ActionUiKind$Companion
+com.intellij.openapi.actionSystem.ActionUiKind$Popup
+- com.intellij.openapi.actionSystem.ActionUiKind
+- isMainMenu():Z
+- isSearchPopup():Z
+com.intellij.openapi.actionSystem.ActionUiKind$Toolbar
+- com.intellij.openapi.actionSystem.ActionUiKind
+- isHorizontal():Z
 e:com.intellij.openapi.actionSystem.ActionUpdateThread
 - java.lang.Enum
 - sf:BGT:com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -1197,7 +1212,6 @@ a:com.intellij.openapi.actionSystem.AnAction
 - getSynonyms():java.util.List
 - f:getTemplatePresentation():com.intellij.openapi.actionSystem.Presentation
 - f:getTemplateText():java.lang.String
-- isDefaultIcon():Z
 - isDumbAware():Z
 - f:isEnabledInModalContext():Z
 - isInInjectedContext():Z
@@ -1205,7 +1219,6 @@ a:com.intellij.openapi.actionSystem.AnAction
 - f:registerCustomShortcutSet(com.intellij.openapi.actionSystem.ShortcutSet,javax.swing.JComponent):V
 - f:registerCustomShortcutSet(com.intellij.openapi.actionSystem.ShortcutSet,javax.swing.JComponent,com.intellij.openapi.Disposable):V
 - f:registerCustomShortcutSet(javax.swing.JComponent,com.intellij.openapi.Disposable):V
-- setDefaultIcon(Z):V
 - pf:setEnabledInModalContext(Z):V
 - setInjectedContext(Z):V
 - f:unregisterCustomShortcutSet(javax.swing.JComponent):V
@@ -1213,31 +1226,37 @@ a:com.intellij.openapi.actionSystem.AnAction
 - useSmallerFontForTextInToolbar():Z
 c:com.intellij.openapi.actionSystem.AnActionEvent
 - com.intellij.ui.PlaceProvider
+- <init>(com.intellij.openapi.actionSystem.DataContext,com.intellij.openapi.actionSystem.Presentation,java.lang.String,com.intellij.openapi.actionSystem.ActionUiKind,java.awt.event.InputEvent,I,com.intellij.openapi.actionSystem.ActionManager):V
 - <init>(java.awt.event.InputEvent,com.intellij.openapi.actionSystem.DataContext,java.lang.String,com.intellij.openapi.actionSystem.Presentation,com.intellij.openapi.actionSystem.ActionManager,I):V
 - <init>(java.awt.event.InputEvent,com.intellij.openapi.actionSystem.DataContext,java.lang.String,com.intellij.openapi.actionSystem.Presentation,com.intellij.openapi.actionSystem.ActionManager,I,Z,Z):V
 - accept(com.intellij.openapi.actionSystem.AnActionEventVisitor):V
+- s:createEvent(com.intellij.openapi.actionSystem.AnAction,com.intellij.openapi.actionSystem.DataContext,com.intellij.openapi.actionSystem.Presentation,java.lang.String,com.intellij.openapi.actionSystem.ActionUiKind,java.awt.event.InputEvent):com.intellij.openapi.actionSystem.AnActionEvent
+- s:createEvent(com.intellij.openapi.actionSystem.DataContext,com.intellij.openapi.actionSystem.Presentation,java.lang.String,com.intellij.openapi.actionSystem.ActionUiKind,java.awt.event.InputEvent):com.intellij.openapi.actionSystem.AnActionEvent
 - s:createFromAnAction(com.intellij.openapi.actionSystem.AnAction,java.awt.event.InputEvent,java.lang.String,com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.AnActionEvent
 - s:createFromDataContext(java.lang.String,com.intellij.openapi.actionSystem.Presentation,com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.AnActionEvent
 - s:createFromInputEvent(com.intellij.openapi.actionSystem.AnAction,java.awt.event.InputEvent,java.lang.String):com.intellij.openapi.actionSystem.AnActionEvent
 - s:createFromInputEvent(java.awt.event.InputEvent,java.lang.String,com.intellij.openapi.actionSystem.Presentation,com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.AnActionEvent
 - s:createFromInputEvent(java.awt.event.InputEvent,java.lang.String,com.intellij.openapi.actionSystem.Presentation,com.intellij.openapi.actionSystem.DataContext,Z,Z):com.intellij.openapi.actionSystem.AnActionEvent
-- getActionManager():com.intellij.openapi.actionSystem.ActionManager
-- getData(com.intellij.openapi.actionSystem.DataKey):java.lang.Object
-- getDataContext():com.intellij.openapi.actionSystem.DataContext
+- f:getActionManager():com.intellij.openapi.actionSystem.ActionManager
+- f:getData(com.intellij.openapi.actionSystem.DataKey):java.lang.Object
+- f:getDataContext():com.intellij.openapi.actionSystem.DataContext
 - s:getInjectedDataContext(com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.DataContext
-- getInputEvent():java.awt.event.InputEvent
-- getModifiers():I
-- getPlace():java.lang.String
-- getPresentation():com.intellij.openapi.actionSystem.Presentation
-- getProject():com.intellij.openapi.project.Project
-- getRequiredData(com.intellij.openapi.actionSystem.DataKey):java.lang.Object
-- getUpdateSession():com.intellij.openapi.actionSystem.UpdateSession
-- isFromActionToolbar():Z
-- isFromContextMenu():Z
-- isInInjectedContext():Z
-- setInjectedContext(Z):V
-- setUpdateSession(com.intellij.openapi.actionSystem.UpdateSession):V
-- withDataContext(com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.AnActionEvent
+- f:getInputEvent():java.awt.event.InputEvent
+- f:getModifiers():I
+- f:getPlace():java.lang.String
+- f:getPresentation():com.intellij.openapi.actionSystem.Presentation
+- f:getProject():com.intellij.openapi.project.Project
+- f:getRequiredData(com.intellij.openapi.actionSystem.DataKey):java.lang.Object
+- f:getUiKind():com.intellij.openapi.actionSystem.ActionUiKind
+- f:getUpdateSession():com.intellij.openapi.actionSystem.UpdateSession
+- f:isFromActionToolbar():Z
+- f:isFromContextMenu():Z
+- f:isFromMainMenu():Z
+- f:isFromSearchPopup():Z
+- f:isInInjectedContext():Z
+- f:setInjectedContext(Z):V
+- f:setUpdateSession(com.intellij.openapi.actionSystem.UpdateSession):V
+- f:withDataContext(com.intellij.openapi.actionSystem.DataContext):com.intellij.openapi.actionSystem.AnActionEvent
 c:com.intellij.openapi.actionSystem.AnActionEventVisitor
 - <init>():V
 - visitEvent(com.intellij.openapi.actionSystem.AnActionEvent):V
@@ -1247,10 +1266,6 @@ c:com.intellij.openapi.actionSystem.AnActionEventVisitor
 f:com.intellij.openapi.actionSystem.AnActionResult
 - isIgnored():Z
 - isPerformed():Z
-com.intellij.openapi.actionSystem.BackgroundableDataProvider
-- com.intellij.openapi.actionSystem.DataProvider
-- a:createBackgroundDataProvider():com.intellij.openapi.actionSystem.DataProvider
-- getData(java.lang.String):java.lang.Object
 c:com.intellij.openapi.actionSystem.CommonDataKeys
 - sf:CARET:com.intellij.openapi.actionSystem.DataKey
 - sf:EDITOR:com.intellij.openapi.actionSystem.DataKey

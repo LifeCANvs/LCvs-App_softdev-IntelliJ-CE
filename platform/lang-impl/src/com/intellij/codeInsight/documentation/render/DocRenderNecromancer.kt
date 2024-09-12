@@ -4,12 +4,15 @@ package com.intellij.codeInsight.documentation.render
 import com.intellij.codeInsight.documentation.render.DocRenderPassFactory.Item
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.editor.CustomFoldRegion
 import com.intellij.openapi.editor.impl.zombie.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.MarkupType
 import com.intellij.psi.PsiManager
 import com.intellij.util.io.DataInputOutputUtil.readINT
 import com.intellij.util.io.DataInputOutputUtil.writeINT
@@ -66,12 +69,21 @@ private class DocRenderNecromancer(
       if (DocRenderManager.isDocRenderingEnabled(editor)) {
         withContext(Dispatchers.EDT) {
           if (recipe.isValid()) {
-            DocRenderPassFactory.applyItemsToRender(editor, project, items, true)
-            DocRenderPassFactory.forceRefreshOnNextPass(editor)
+            //maybe readaction
+            writeIntentReadAction {
+              DocRenderPassFactory.applyItemsToRender(editor, project, items, true)
+              DocRenderPassFactory.forceRefreshOnNextPass(editor)
+              FUSProjectHotStartUpMeasurer.markupRestored(recipe, MarkupType.DOC_RENDER)
+            }
           }
         }
       }
     } else {
+      val editor = recipe.editorSupplier()
+      if (!DocRenderManager.isDocRenderingEnabled(editor)) {
+        // abort items calc asap IJPL-160508
+        return
+      }
       val document = recipe.document
       val psiManager = project.serviceAsync<PsiManager>()
       val stampAndItems = readAction {
@@ -82,10 +94,9 @@ private class DocRenderNecromancer(
       if (stampAndItems != null) {
         val (stamp, items) = stampAndItems
         if (!items.isEmpty) {
-          val editor = recipe.editorSupplier()
-          if (DocRenderManager.isDocRenderingEnabled(editor)) {
-            withContext(Dispatchers.EDT) {
-              if (!project.isDisposed && !editor.isDisposed && document.modificationStamp == stamp) {
+          withContext(Dispatchers.EDT) {
+            if (!project.isDisposed && !editor.isDisposed && document.modificationStamp == stamp) {
+              writeIntentReadAction {
                 DocRenderPassFactory.applyItemsToRender(editor, project, items, true)
               }
             }

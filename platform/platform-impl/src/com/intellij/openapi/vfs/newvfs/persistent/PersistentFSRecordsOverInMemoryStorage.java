@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vfs.newvfs.persistent;
 
-import com.intellij.platform.util.io.storages.mmapped.MMappedFileStorage;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
@@ -121,11 +120,12 @@ public final class PersistentFSRecordsOverInMemoryStorage implements PersistentF
   }
 
   @Override
-  public int allocateRecord() {
+  public int allocateRecord() throws IOException {
     final int recordId = allocatedRecordsCount.incrementAndGet();
     if (recordId > maxRecords) {
       throw new IndexOutOfBoundsException("maxRecords(=" + maxRecords + ") limit exceeded");
     }
+    markRecordAsModified(recordId);
     markDirty();
     return recordId;
   }
@@ -241,24 +241,6 @@ public final class PersistentFSRecordsOverInMemoryStorage implements PersistentF
   }
 
   @Override
-  public void fillRecord(final int recordId,
-                         final long timestamp,
-                         final long length,
-                         final int flags,
-                         final int nameId,
-                         final int parentId,
-                         final boolean overwriteAttrRef) throws IOException {
-    setParent(recordId, parentId);
-    updateNameId(recordId, nameId);
-    setFlags(recordId, flags);
-    if (overwriteAttrRef) {
-      setAttributeRecordId(recordId, 0);
-    }
-    setTimestamp(recordId, timestamp);
-    setLength(recordId, length);
-  }
-
-  @Override
   public void cleanRecord(final int recordId) throws IOException {
     checkRecordId(recordId);
     //fill record with zeros, by 4 bytes at once:
@@ -268,18 +250,19 @@ public final class PersistentFSRecordsOverInMemoryStorage implements PersistentF
       final int offset = recordStartAtBytes + wordNo * Integer.BYTES;
       INT_HANDLE.setVolatile(records, offset, 0);
     }
+    markDirty();
   }
 
   @Override
-  public <R, E extends Throwable> R readRecord(int recordId,
-                                               @NotNull RecordReader<R, E> reader) throws E, IOException {
+  public <R> R readRecord(int recordId,
+                          @NotNull RecordReader<R> reader) throws IOException {
     RecordAccessor recordAccessor = new RecordAccessor(recordId, this);
     return reader.readRecord(recordAccessor);
   }
 
   @Override
-  public <E extends Throwable> int updateRecord(int recordId,
-                                                @NotNull RecordUpdater<E> updater) throws E, IOException {
+  public int updateRecord(int recordId,
+                          @NotNull RecordUpdater updater) throws IOException {
     int trueRecordId = (recordId <= NULL_ID) ?
                        allocateRecord() :
                        recordId;
@@ -293,12 +276,12 @@ public final class PersistentFSRecordsOverInMemoryStorage implements PersistentF
   }
 
   @Override
-  public <R, E extends Throwable> R readHeader(@NotNull HeaderReader<R, E> reader) throws E, IOException {
+  public <R> R readHeader(@NotNull HeaderReader<R> reader) throws IOException {
     return reader.readHeader(headerAccessor);
   }
 
   @Override
-  public <E extends Throwable> void updateHeader(@NotNull HeaderUpdater<E> updater) throws E, IOException {
+  public void updateHeader(@NotNull HeaderUpdater updater) throws IOException {
     if (updater.updateHeader(headerAccessor)) {
       globalModCount.incrementAndGet();
     }

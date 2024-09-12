@@ -2,7 +2,7 @@
 package org.jetbrains.kotlin.idea.k2.codeinsight.imports
 
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.components.KaScopeContext
+import org.jetbrains.kotlin.analysis.api.components.KaScopeWithKind
 import org.jetbrains.kotlin.analysis.api.scopes.KaScope
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
 import org.jetbrains.kotlin.name.Name
@@ -23,14 +23,10 @@ internal class HierarchicalScope private constructor(private val scopes: List<Ka
     }
 
     companion object {
-        fun KaSession.createFrom(scopeContext: KaScopeContext): HierarchicalScope {
-            val scopeGroupsSorted = scopeContext.scopes
-                .groupBy({ it.kind }, { it.scope })
-                .toSortedMap(compareByDescending { it.indexInTower })
+        fun KaSession.createFrom(scopes: List<KaScopeWithKind>): HierarchicalScope {
+            val scopesSorted = scopes.sortedBy { it.kind.indexInTower }.map { it.scope }
 
-            val scopes = scopeGroupsSorted.values.map { it.asCompositeScope() }
-
-            return HierarchicalScope(scopes)
+            return HierarchicalScope(scopesSorted)
         }
     }
 }

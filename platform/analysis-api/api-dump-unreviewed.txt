@@ -168,6 +168,7 @@ com.intellij.codeInsight.completion.BatchConsumer
 - startBatch():V
 a:com.intellij.codeInsight.completion.CompletionConfidence
 - <init>():V
+- shouldSkipAutopopup(com.intellij.openapi.editor.Editor,com.intellij.psi.PsiElement,com.intellij.psi.PsiFile,I):com.intellij.util.ThreeState
 - shouldSkipAutopopup(com.intellij.psi.PsiElement,com.intellij.psi.PsiFile,I):com.intellij.util.ThreeState
 f:com.intellij.codeInsight.completion.CompletionConfidenceEP
 - com.intellij.lang.LanguageExtensionPoint
@@ -522,6 +523,11 @@ a:com.intellij.codeInsight.highlighting.HighlightErrorFilter
 - sf:EP_NAME:com.intellij.openapi.extensions.ProjectExtensionPointName
 - <init>():V
 - a:shouldHighlightErrorElement(com.intellij.psi.PsiErrorElement):Z
+*:com.intellij.codeInsight.highlighting.PsiHighlightedReference
+- com.intellij.model.psi.PsiSymbolReference
+- highlightMessage():java.lang.String
+- highlightReference(com.intellij.lang.annotation.AnnotationBuilder):com.intellij.lang.annotation.AnnotationBuilder
+- highlightSeverity():com.intellij.lang.annotation.HighlightSeverity
 com.intellij.codeInsight.hint.QuestionAction
 - a:execute():Z
 a:com.intellij.codeInsight.intention.AbstractEmptyIntentionAction
@@ -544,6 +550,7 @@ com.intellij.codeInsight.intention.CustomizableIntentionAction
 - hasSeparatorAbove():Z
 - isSelectable():Z
 - isShowIcon():Z
+- isShowLightBulb():Z
 - isShowSubmenu():Z
 f:com.intellij.codeInsight.intention.CustomizableIntentionAction$RangeToHighlight
 - <init>(com.intellij.psi.PsiElement,com.intellij.openapi.util.TextRange,com.intellij.openapi.editor.colors.TextAttributesKey):V
@@ -930,7 +937,6 @@ com.intellij.codeInsight.lookup.LookupListener
 *f:com.intellij.codeInsight.lookup.LookupPresentation$Builder
 - <init>():V
 - <init>(com.intellij.codeInsight.lookup.LookupPresentation):V
-- b:<init>(com.intellij.codeInsight.lookup.LookupPresentation,I,kotlin.jvm.internal.DefaultConstructorMarker):V
 - f:build():com.intellij.codeInsight.lookup.LookupPresentation
 - f:withMaxVisibleItemsCount(kotlin.properties.ReadWriteProperty):com.intellij.codeInsight.lookup.LookupPresentation$Builder
 - f:withMostRelevantOnTop(Z):com.intellij.codeInsight.lookup.LookupPresentation$Builder
@@ -1527,6 +1533,7 @@ com.intellij.codeInspection.QuickFix
 - a:getFamilyName():java.lang.String
 - getName():java.lang.String
 com.intellij.codeInspection.RedundantSuppressionDetector
+- com.intellij.openapi.project.PossiblyDumbAware
 - a:createRemoveRedundantSuppressionFix(java.lang.String):com.intellij.codeInspection.LocalQuickFix
 - getHighlightingRange(com.intellij.psi.PsiElement,java.lang.String):com.intellij.openapi.util.TextRange
 - a:getSuppressionIds(com.intellij.psi.PsiElement):java.lang.String
@@ -2238,6 +2245,10 @@ e:com.intellij.ide.scratch.ScratchFileService$Option
 f:com.intellij.ide.scratch.ScratchUtil
 - s:getRelativePath(com.intellij.openapi.project.Project,com.intellij.openapi.vfs.VirtualFile):java.lang.String
 - s:isScratch(com.intellij.openapi.vfs.VirtualFile):Z
+f:com.intellij.inlinePrompt.InlinePrompt
+- *sf:isInlinePromptShown(com.intellij.openapi.editor.Editor):Z
+- *sf:isInlinePromptShown(com.intellij.openapi.editor.Editor,com.intellij.openapi.project.Project):Z
+- *bs:isInlinePromptShown$default(com.intellij.openapi.editor.Editor,com.intellij.openapi.project.Project,I,java.lang.Object):Z
 f:com.intellij.lang.BracePair
 - <init>(com.intellij.psi.tree.IElementType,com.intellij.psi.tree.IElementType,Z):V
 - getLeftBraceType():com.intellij.psi.tree.IElementType
@@ -3411,10 +3422,10 @@ a:com.intellij.openapi.vfs.newvfs.ArchiveFileSystem
 *a:com.intellij.openapi.vfs.newvfs.AttributeOutputStream
 - com.intellij.util.io.DataOutputStream
 - com.intellij.util.io.RepresentableAsByteArraySequence
-- <init>(com.intellij.util.io.DataOutputStream):V
+- <init>(java.io.OutputStream):V
 - asByteArraySequence():com.intellij.openapi.util.io.ByteArraySequence
 - a:writeEnumeratedString(java.lang.String):V
-*f:com.intellij.openapi.vfs.newvfs.AttributeOutputStreamBase
+*f:com.intellij.openapi.vfs.newvfs.AttributeOutputStreamImpl
 - com.intellij.openapi.vfs.newvfs.AttributeOutputStream
 - writeEnumeratedString(java.lang.String):V
 c:com.intellij.openapi.vfs.newvfs.FileAttribute

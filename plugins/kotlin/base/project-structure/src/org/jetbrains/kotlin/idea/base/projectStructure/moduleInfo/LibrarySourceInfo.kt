@@ -5,7 +5,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.isFile
+import com.intellij.platform.backend.workspace.virtualFile
+import com.intellij.platform.backend.workspace.workspaceModel
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.workspaceModel.ide.legacyBridge.findLibraryEntity
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.idea.base.projectStructure.KotlinBaseProjectStructureBundle
 import org.jetbrains.kotlin.idea.base.projectStructure.LibraryInfoCache
@@ -17,6 +21,10 @@ import org.jetbrains.kotlin.resolve.PlatformDependentAnalyzerServices
 
 data class LibrarySourceInfo(override val project: Project, val library: Library, override val binariesModuleInfo: BinaryModuleInfo) :
     IdeaModuleInfo, SourceForBinaryModuleInfo {
+
+    val librarySourceFile: VirtualFile? =
+        library.findLibraryEntity(project.workspaceModel.currentSnapshot)
+            ?.entitySource?.virtualFileUrl?.virtualFile?.takeIf(VirtualFile::isFile)
 
     override val name: Name = Name.special("<sources for library ${library.name}>")
 

@@ -1,22 +1,26 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.inline.codeInliner
 
+import com.intellij.psi.CommonClassNames
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiJavaFile
+import com.intellij.psi.PsiMember
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaModuleProvider
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.singleCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
-import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaFunctionType
+import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.idea.codeinsight.utils.addTypeArguments
 import org.jetbrains.kotlin.idea.codeinsight.utils.getRenderedTypeArguments
 import org.jetbrains.kotlin.idea.k2.refactoring.getThisQualifier
@@ -190,7 +194,7 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
         val parent = expression.parent
         if (parent is KtValueArgumentName || parent is KtCallableReferenceExpression) return@forEachDescendantOfType
         val resolve = expression.mainReference.resolve()
-        val target = resolve as? KtNamedDeclaration
+        val target = resolve as? KtNamedDeclaration ?: resolve as? PsiMember
 
         if (target is KtParameter) {
             fun getParameterName(): Name = if (isAnonymousFunction && target.ownerFunction == originalDeclaration) {
@@ -206,24 +210,37 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
             expression.putCopyableUserData(CodeToInline.PARAMETER_USAGE_KEY, Name.identifier("p1"))
         }
 
-        fun isImportable(t: KtNamedDeclaration): Boolean {
-            analyze(t) {
-                val resolvedSymbol = t.symbol
-                val containingSymbol = resolvedSymbol.containingDeclaration ?: return true
+        fun isImportable(t: PsiElement): Boolean {
+            val module = KaModuleProvider.getModule(t.project, t, useSiteModule = null)
+            return analyze(module) {
+                val resolvedSymbol = when (t) {
+                    is KtNamedDeclaration -> t.symbol
+                    is PsiMember -> {
+                        if ((t.containingFile as? PsiJavaFile)?.packageName == CommonClassNames.DEFAULT_PACKAGE) {
+                            return@analyze false
+                        }
+                        t.callableSymbol
+                    }
+                    else -> null
+                } ?: return@analyze false
+                val containingSymbol = resolvedSymbol.containingDeclaration ?: return@analyze true
                 if (containingSymbol is KaDeclarationContainerSymbol) {
                     val staticScope = containingSymbol.staticMemberScope
-                    return resolvedSymbol in staticScope.declarations
+                    return@analyze resolvedSymbol in staticScope.declarations
                 }
-                return false
+                return@analyze false
             }
         }
 
         val targetParent = target?.parent
-        if (targetParent is KtFile ||
-            (target as? KtCallableDeclaration)?.receiverTypeReference != null ||
-            target != null && isImportable(target)
+        val isLocalInline =
+            originalDeclaration is KtProperty && originalDeclaration.isLocal || originalDeclaration is KtFunction && originalDeclaration.isLocal
+        if (!isLocalInline && (targetParent is KtFile ||
+                    (target as? KtCallableDeclaration)?.receiverTypeReference != null ||
+                    target != null && isImportable(target))
         ) {
-            val importableFqName = target.fqName ?: return@forEachDescendantOfType
+            val importableFqName =
+                (target as? KtNamedDeclaration)?.fqName ?: (target as? PsiMember)?.kotlinFqName ?: return@forEachDescendantOfType
             val shortName = importableFqName.shortName()
             val ktFile = expression.containingKtFile
             val aliasName = if (shortName.asString() != expression.getReferencedName())
@@ -251,7 +268,7 @@ internal fun encodeInternalReferences(codeToInline: MutableCodeToInline, origina
 
                 val value =
                     (partiallyAppliedSymbol?.extensionReceiver ?: partiallyAppliedSymbol?.dispatchReceiver) as? KaImplicitReceiverValue
-                val originalSymbol = originalDeclaration.symbol as? KaCallableSymbol
+                val originalSymbol = ((originalDeclaration as? KtPropertyAccessor)?.property ?: originalDeclaration).symbol as? KaCallableSymbol
                 val originalSymbolReceiverType = originalSymbol?.receiverType
                 val originalSymbolDispatchType = originalSymbol?.dispatchReceiverType
                 if (value != null && !(resolve is KtParameter && resolve.ownerFunction == originalDeclaration)) {

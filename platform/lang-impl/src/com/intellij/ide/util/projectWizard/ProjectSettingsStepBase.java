@@ -10,7 +10,6 @@ import com.intellij.lang.LangBundle;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.AccessToken;
-import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.ui.*;
@@ -29,6 +28,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.SlowOperations;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
+import kotlin.Unit;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -54,14 +54,19 @@ import static com.intellij.openapi.wm.impl.welcomeScreen.FlatWelcomeFrame.BOTTOM
  * {@link AbstractNewProjectStep}
  */
 public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implements DumbAware, Disposable {
-  protected DirectoryProjectGenerator<T> myProjectGenerator;
+  protected final DirectoryProjectGenerator<T> myProjectGenerator;
   protected AbstractNewProjectStep.AbstractCallback<T> myCallback;
   protected TextFieldWithBrowseButton myLocationField;
-  protected NotNullLazyValue<File> myProjectDirectory;
+  protected final NotNullLazyValue<File> myProjectDirectory;
   protected JButton myCreateButton;
   protected JLabel myErrorLabel;
   protected NotNullLazyValue<ProjectGeneratorPeer<T>> myLazyGeneratorPeer;
   private AbstractNewProjectStep<T> myProjectStep;
+  /**
+   * If {@link ProjectGeneratorPeer#getComponent()} is Kotlin DSL UI, we store it here and use for validation
+   */
+  @Nullable
+  private DialogPanelWrapper myDialogPanelWrapper;
 
   public ProjectSettingsStepBase(DirectoryProjectGenerator<T> projectGenerator,
                                  AbstractNewProjectStep.AbstractCallback<T> callback) {
@@ -114,6 +119,7 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
     bottomPanel.add(label, BorderLayout.NORTH);
     bottomPanel.add(button, BorderLayout.EAST);
     mainPanel.add(bottomPanel, BorderLayout.SOUTH);
+    checkValid();
     return mainPanel;
   }
 
@@ -139,7 +145,17 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
       @Override
       public void actionPerformed(ActionEvent e) {
         boolean isValid = checkValid();
-        if (isValid && myCallback != null) {
+        if (!isValid) return;
+
+        var dialogPanel = myDialogPanelWrapper;
+        if (dialogPanel != null) {
+          var applyError = dialogPanel.applyOrGetError();
+          setErrorText(applyError != null ? applyError.message : null);
+          if (applyError != null) {
+            return;
+          }
+        }
+        if (myCallback != null) {
           final DialogWrapper dialog = DialogWrapper.findInstance(myCreateButton);
           if (dialog != null) {
             dialog.close(DialogWrapper.OK_EXIT_CODE);
@@ -237,12 +253,15 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
       }
 
       ValidationInfo peerValidationResult = getPeer().validate();
+      if (peerValidationResult == null) {
+        var dialogWrapper = myDialogPanelWrapper;
+        peerValidationResult = (dialogWrapper != null) ? dialogWrapper.getInputValidationError() : null;
+      }
       if (peerValidationResult != null) {
         setErrorText(peerValidationResult.message);
         return false;
       }
     }
-
     setErrorText(null);
     return true;
   }
@@ -300,7 +319,19 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
 
   protected @Nullable JPanel createAdvancedSettings() {
     final JPanel jPanel = new JPanel(new VerticalFlowLayout(0, 5));
-    jPanel.add(getPeer().getComponent(myLocationField, () -> checkValid()));
+    var component = getPeer().getComponent();
+    // If a component is a DialogPanel, created with Kotlin DSL UI,
+    // it may have validation which must be obeyed as is done for DialogWrapper
+    if (component instanceof DialogPanel dialogPanel) {
+      var dialogPanelWrapper = new DialogPanelWrapper(dialogPanel);
+      myDialogPanelWrapper = dialogPanelWrapper;
+      dialogPanel.registerValidators(this, map -> {
+        dialogPanelWrapper.setInputValidationError(map.values());
+        checkValid();
+        return Unit.INSTANCE;
+      });
+    }
+    jPanel.add(component);
     return jPanel;
   }
 
@@ -327,9 +358,10 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
       textField.putClientProperty(DialogWrapperPeer.HAVE_INITIAL_SELECTION, true);
     }
 
-    final FileChooserDescriptor descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
-    myLocationField.addBrowseFolderListener(IdeBundle.message("directory.project.location.title"),
-                                            IdeBundle.message("directory.project.location.description"), null, descriptor);
+    myLocationField.addBrowseFolderListener(null, FileChooserDescriptorFactory.createSingleFolderDescriptor()
+      .withTitle(IdeBundle.message("directory.project.location.title"))
+      .withDescription(IdeBundle.message("directory.project.location.description")));
+    checkValid();
     return LabeledComponent.create(myLocationField,
                                    BundleBase.replaceMnemonicAmpersand(IdeBundle.message("directory.project.location.label")),
                                    BorderLayout.WEST);
@@ -342,11 +374,11 @@ public class ProjectSettingsStepBase<T> extends AbstractActionWithPanel implemen
   @Override
   public void dispose() { }
 
-  void setProjectStep(@NotNull AbstractNewProjectStep<T> projectStep) {
+  final void setProjectStep(@NotNull AbstractNewProjectStep<T> projectStep) {
     myProjectStep = projectStep;
   }
 
-  @Nullable WizardContext getWizardContext() {
+  final @Nullable WizardContext getWizardContext() {
     return myProjectStep != null ? myProjectStep.getWizardContext() : null;
   }
 }

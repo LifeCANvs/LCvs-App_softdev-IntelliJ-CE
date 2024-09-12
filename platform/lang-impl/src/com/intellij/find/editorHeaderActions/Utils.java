@@ -5,16 +5,17 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.CustomShortcutSet;
 import com.intellij.openapi.actionSystem.Shortcut;
-import com.intellij.openapi.ui.popup.*;
+import com.intellij.openapi.ui.popup.AlignedPopup;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.ui.popup.PopupChooserBuilder;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
@@ -27,10 +28,6 @@ public final class Utils {
   private Utils() {
   }
 
-  /**
-   * @deprecated Please use {@link #showCompletionPopup(JComponent, List, String, JTextComponent, String, String)} instead.
-   */
-  @Deprecated
   public static void showCompletionPopup(JComponent toolbarComponent,
                                          JList<String> list,
                                          @NlsContexts.PopupTitle String title,
@@ -54,39 +51,12 @@ public final class Utils {
       .setResizable(false)
       .setRequestFocus(true)
       .setItemChosenCallback(callback)
-      .setRenderer(textListCellRenderer((@NlsSafe var s) -> s))
+      .setRenderer(textListCellRenderer((@Nls String s) -> s))
       .createPopup();
 
     if (ad != null) {
       popup.setAdText(ad, SwingConstants.LEFT);
     }
-
-    JComponent parent = toolbarComponent != null ? toolbarComponent : textField;
-    AlignedPopup.showUnderneathWithoutAlignment(popup, parent);
-  }
-
-  public static void showCompletionPopup(JComponent toolbarComponent,
-                                         List<String> list,
-                                         @NlsContexts.PopupTitle String title,
-                                         JTextComponent textField,
-                                         @NlsContexts.PopupAdvertisement String ad,
-                                         @Nls @Nullable String accessibleName) {
-
-    final IPopupChooserBuilder<String> builder = JBPopupFactory.getInstance().createPopupChooserBuilder(list);
-    if (title != null) builder.setTitle(title);
-    if (accessibleName != null) builder.setAccessibleName(accessibleName);
-    final JBPopup popup = builder
-      .setMovable(false)
-      .setResizable(false)
-      .setRequestFocus(true)
-      .setItemChosenCallback(s -> {
-        textField.setText(s);
-        IdeFocusManager.getGlobalInstance().requestFocus(textField, false);
-      })
-      .setRenderer(textListCellRenderer((@Nls var s) -> s))
-      .createPopup();
-
-    if (ad != null) popup.setAdText(ad, SwingConstants.LEFT);
 
     JComponent parent = toolbarComponent != null ? toolbarComponent : textField;
     AlignedPopup.showUnderneathWithoutAlignment(popup, parent);

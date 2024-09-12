@@ -93,7 +93,7 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
         }
         else {
           scope.launch(modality.asContextElement() + Dispatchers.EDT) {
-            blockingContext {
+            writeIntentReadAction {
               dumbTaskLaunchers.remove(this@DumbTaskLauncher)
               decrementDumbCounter()
             }
@@ -347,10 +347,10 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
 
     if (wasDumb != currentState.isDumb) {
       if (currentState.isDumb) {
-        runCatchingIgnorePCE { myPublisher.enteredDumbMode() }
+        runCatchingIgnorePCE { WriteIntentReadAction.run { myPublisher.enteredDumbMode() } }
       }
       else {
-        runCatchingIgnorePCE { myPublisher.exitDumbMode() }
+        runCatchingIgnorePCE { WriteIntentReadAction.run { myPublisher.exitDumbMode() } }
       }
     }
   }
@@ -469,6 +469,14 @@ open class DumbServiceImpl @NonInjectable @VisibleForTesting constructor(private
     else {
       DumbModeBlockedFunctionalityCollector.logActionBlocked(project, actionId)
     }
+    doShowDumbModeNotification(message)
+  }
+
+  /**
+   * This method is designed to be used when [DumbAware] action was invoked in dumb mode and threw [IndexNotReadyException]
+   */
+  fun showDumbModeNotificationForFailedAction(message: @NlsContexts.PopupContent String, actionId: String?) {
+    DumbModeBlockedFunctionalityCollector.logActionFailedToExecute(project, actionId)
     doShowDumbModeNotification(message)
   }
 

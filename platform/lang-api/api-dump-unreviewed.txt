@@ -1294,7 +1294,8 @@ f:com.intellij.codeInsight.hints.declarative.InlayActionData
 - hashCode():I
 com.intellij.codeInsight.hints.declarative.InlayActionHandler
 - sf:Companion:com.intellij.codeInsight.hints.declarative.InlayActionHandler$Companion
-- a:handleClick(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.hints.declarative.InlayActionPayload):V
+- handleClick(com.intellij.openapi.editor.Editor,com.intellij.codeInsight.hints.declarative.InlayActionPayload):V
+- handleClick(com.intellij.openapi.editor.event.EditorMouseEvent,com.intellij.codeInsight.hints.declarative.InlayActionPayload):V
 f:com.intellij.codeInsight.hints.declarative.InlayActionHandler$Companion
 - f:getActionHandler(java.lang.String):com.intellij.codeInsight.hints.declarative.InlayActionHandler
 f:com.intellij.codeInsight.hints.declarative.InlayActionHandlerBean
@@ -1328,6 +1329,7 @@ f:com.intellij.codeInsight.hints.declarative.InlayHintsCustomSettingsProviderBea
 f:com.intellij.codeInsight.hints.declarative.InlayHintsCustomSettingsProviderBean$Companion
 - f:getEP():com.intellij.openapi.extensions.ExtensionPointName
 com.intellij.codeInsight.hints.declarative.InlayHintsProvider
+- com.intellij.openapi.project.PossiblyDumbAware
 - sf:Companion:com.intellij.codeInsight.hints.declarative.InlayHintsProvider$Companion
 - a:createCollector(com.intellij.psi.PsiFile,com.intellij.openapi.editor.Editor):com.intellij.codeInsight.hints.declarative.InlayHintsCollector
 - s:getINLAY_PAYLOADS():com.intellij.openapi.actionSystem.DataKey
@@ -1465,6 +1467,12 @@ f:com.intellij.codeInsight.hints.declarative.StringInlayActionPayload
 - <init>(java.lang.String):V
 - equals(java.lang.Object):Z
 - f:getText():java.lang.String
+- hashCode():I
+f:com.intellij.codeInsight.hints.declarative.SymbolPointerInlayActionPayload
+- com.intellij.codeInsight.hints.declarative.InlayActionPayload
+- <init>(com.intellij.model.Pointer):V
+- equals(java.lang.Object):Z
+- f:getPointer():com.intellij.model.Pointer
 - hashCode():I
 a:com.intellij.codeInsight.hints.presentation.BasePresentation
 - com.intellij.codeInsight.hints.presentation.InlayPresentation
@@ -2192,6 +2200,7 @@ com.intellij.execution.services.ServiceViewDescriptor
 - onNodeSelected(java.util.List):V
 - onNodeUnselected():V
 com.intellij.execution.services.ServiceViewDnDDescriptor
+- sf:LIST_DATA_FLAVOR:java.awt.datatransfer.DataFlavor
 - a:canDrop(com.intellij.ide.dnd.DnDEvent,com.intellij.execution.services.ServiceViewDnDDescriptor$Position):Z
 - a:drop(com.intellij.ide.dnd.DnDEvent,com.intellij.execution.services.ServiceViewDnDDescriptor$Position):V
 e:com.intellij.execution.services.ServiceViewDnDDescriptor$Position
@@ -2817,7 +2826,7 @@ com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
 - filterControlSymbols(java.lang.String):java.lang.String
 - getActions(java.lang.Runnable):java.util.List
 - getAdvertisement():java.lang.String
-- a:getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
+- getDataForItem(java.lang.Object,java.lang.String):java.lang.Object
 - getElementPriority(java.lang.Object,java.lang.String):I
 - a:getElementsRenderer():javax.swing.ListCellRenderer
 - getFullGroupName():java.lang.String

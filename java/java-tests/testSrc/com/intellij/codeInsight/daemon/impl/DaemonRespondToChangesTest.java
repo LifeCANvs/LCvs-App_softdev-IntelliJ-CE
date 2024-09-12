@@ -218,7 +218,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     Document document = getDocument(getFile());
     assertNotEmpty(highlightErrors());
     List<HighlightInfo> errors = DaemonCodeAnalyzerImpl.getHighlights(document, HighlightSeverity.ERROR, getProject());
-    assertEquals(1, errors.size());
+    assertSize(1, errors);
     TextRange dirty = myDaemonCodeAnalyzer.getFileStatusMap().getFileDirtyScope(document, getFile(), Pass.UPDATE_ALL);
     assertNull(dirty);
 
@@ -313,24 +313,24 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
 
   public void testUnusedFieldUpdate() {
     configureByText(JavaFileType.INSTANCE, """
-     class Unused {
-       private int ffff;
-       void foo(int p) {
-         if (p==0) return;
-         <caret>
+       class Unused {
+         private int ffff;
+         void foo(int p) {
+           if (p==0) return;
+           <caret>
+         }
        }
-     }
-    """);
+      """);
     Document document = getDocument(getFile());
     List<HighlightInfo> infos = doHighlighting(HighlightSeverity.WARNING);
-    assertEquals(1, infos.size());
+    assertSize(1, infos);
     assertEquals("Private field 'ffff' is never used", infos.get(0).getDescription());
 
     type("  foo(ffff++);");
     assertEmpty(highlightErrors());
 
     List<HighlightInfo> errors = DaemonCodeAnalyzerImpl.getHighlights(document, HighlightSeverity.WARNING, getProject());
-    assertEquals(0, errors.size());
+    assertSize(0, errors);
   }
 
   public void testUnusedMethodUpdate() {
@@ -351,7 +351,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     PlatformTestUtil.invokeNamedAction(IdeActions.ACTION_COMMENT_LINE);
     infos = doHighlighting(HighlightSeverity.WARNING);
 
-    assertEquals(1, infos.size());
+    assertSize(1, infos);
     assertEquals("Method 'ffff()' is never used", infos.get(0).getDescription());
   }
 
@@ -359,7 +359,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
   public void testAssignedButUnreadFieldUpdate() throws Exception {
     configureByFile(BASE_PATH + "AssignedButUnreadField.java");
     List<HighlightInfo> infos = doHighlighting(HighlightSeverity.WARNING);
-    assertEquals(1, infos.size());
+    assertSize(1, infos);
     assertEquals("Private field 'text' is assigned but never accessed", infos.get(0).getDescription());
 
     ctrlW();
@@ -370,7 +370,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     assertEmpty(getFile().getText(), errors);
   }
 
-  public void testDaemonIgnoresNonPhysicalEditor() {
+  public void testDaemonIgnoresNonPhysicalEditor() throws Exception {
     configureByText(JavaFileType.INSTANCE, """
       class AClass<caret> {
           
@@ -396,7 +396,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
   }
 
 
-  public void testDaemonIgnoresConsoleActivities() {
+  public void testDaemonIgnoresConsoleActivities() throws Exception {
     configureByText(JavaFileType.INSTANCE, """
       class AClass<caret> {
           
@@ -448,7 +448,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     }
   }
 
-  private void checkDaemonReaction(boolean mustCancelItself, @NotNull Runnable action) {
+  private void checkDaemonReaction(boolean mustCancelItself, @NotNull Runnable action) throws Exception {
     PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
     highlightErrors();
     myDaemonCodeAnalyzer.waitForTermination();
@@ -552,7 +552,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
       }}""");
 
     Collection<HighlightInfo> infos = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(3, infos.size());
+    assertSize(3, infos);
 
     AtomicInteger count = new AtomicInteger();
     MarkupModelEx modelEx = (MarkupModelEx)DocumentMarkupModel.forDocument(getDocument(getFile()), getProject(), true);
@@ -684,7 +684,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
 
     try {
       Collection<HighlightInfo> errors = highlightErrors();
-      assertEquals(3, errors.size());
+      assertSize(3, errors);
       new GotoNextErrorHandler(true).invoke(getProject(), getEditor(), getFile());
 
       List<IntentionAction> fixes = LightQuickFixTestCase.getAvailableActions(getEditor(), getFile());
@@ -694,7 +694,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
       WriteCommandAction.runWriteCommandAction(getProject(), () -> finalFix.invoke(getProject(), getEditor(), getFile()));
 
       errors = highlightErrors();
-      assertEquals(2, errors.size());
+      assertSize(2, errors);
 
       new GotoNextErrorHandler(true).invoke(getProject(), getEditor(), getFile());
       fixes = LightQuickFixTestCase.getAvailableActions(getEditor(), getFile());
@@ -753,7 +753,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
 
     TextRange[] highlightersAfter = getHighlightersTextRange(markup);
 
-    assertEquals(highlightersBefore.length, highlightersAfter.length);
+    assertSize(highlightersBefore.length, highlightersAfter);
     for (int i = 0; i < highlightersBefore.length; i++) {
       TextRange before = highlightersBefore[i];
       TextRange after = highlightersAfter[i];
@@ -868,7 +868,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     configureByText(JavaFileType.INSTANCE, "@Deprecated<caret> class S { } ");
 
     List<HighlightInfo> infos = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(2, infos.size());
+    assertSize(2, infos);
 
     assertEquals("@Deprecated", infos.get(0).getText());
     assertEquals("S", infos.get(1).getText());
@@ -888,12 +888,11 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     type(" ");
 
     after = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(2, after.size());
+    assertSize(2, after);
 
     assertEquals("@Deprecated", after.get(0).getText());
     assertEquals("S", after.get(1).getText());
   }
-
 
   public void testModificationInsideCodeBlockDoesNotAffectErrorMarkersOutside() {
     configureByText(JavaFileType.INSTANCE, """
@@ -939,7 +938,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     }, "My", this);
 
     List<HighlightInfo> errs = highlightErrors();
-    assertEquals(2, errs.size());
+    assertSize(2, errs);
     assertEquals("'}' expected", errs.get(0).getDescription());
 
     undo();
@@ -963,7 +962,12 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
       try {
         StoreUtil.saveDocumentsAndProjectsAndApp(false);
 
-        checkDaemonReaction(false, () -> StoreUtil.saveDocumentsAndProjectsAndApp(false));
+        try {
+          checkDaemonReaction(false, () -> StoreUtil.saveDocumentsAndProjectsAndApp(false));
+        }
+        catch (Exception e) {
+          throw new RuntimeException(e);
+        }
       }
       finally {
         settings.setSaveOnFrameDeactivation(frameSave);
@@ -993,10 +997,10 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
 
   public void testApplyErrorInTheMiddle() {
     String text = "class <caret>X { " + """
-
-                                               {
-                                           //    String x = "<zzzzzzzzzz/>";
-                                               }""".repeat(100) +
+      
+          {
+      //    String x = "<zzzzzzzzzz/>";
+          }""".repeat(100) +
                   "\n}";
     configureByText(JavaFileType.INSTANCE, text);
 
@@ -1007,7 +1011,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
 
     type("//");
     List<HighlightInfo> errors = highlightErrors();
-    assertEquals(2, errors.size());
+    assertSize(2, errors);
 
     backspace();
     backspace();
@@ -1058,16 +1062,16 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     ((EditorImpl)myEditor).getScrollPane().getViewport().setSize(1000, 1000);
 
     List<HighlightInfo> infos = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(4, infos.size());
+    assertSize(4, infos);
 
     type('\n');
     infos = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(4, infos.size());
+    assertSize(4, infos);
 
     deleteLine();
 
     infos = doHighlighting(HighlightInfoType.SYMBOL_TYPE_SEVERITY);
-    assertEquals(4, infos.size());
+    assertSize(4, infos);
   }
 
 
@@ -1331,7 +1335,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     return blocks;
   }
 
-  public void testCodeFoldingInSplittedWindowAppliesToAllEditors() {
+  public void testCodeFoldingInSplittedWindowAppliesToAllEditors() throws Exception {
     Set<Editor> applied = ConcurrentCollectionFactory.createConcurrentSet();
     Set<Editor> collected = ConcurrentCollectionFactory.createConcurrentSet();
     registerFakePass(applied, collected);
@@ -1352,7 +1356,7 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
     assertEquals(applied, ContainerUtil.newHashSet(editor1, editor2));
   }
 
-  public void testHighlightingInSplittedWindowFinishesEventually() {
+  public void testHighlightingInSplittedWindowFinishesEventually() throws Exception {
     myDaemonCodeAnalyzer.serializeCodeInsightPasses(true); // reproduced only for serialized passes
     try {
       Collection<Editor> applied = ContainerUtil.createConcurrentList();
@@ -1574,7 +1578,13 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
   }
 
   public void testModificationInsideCodeBlockDoesNotRehighlightWholeFile() {
-    configureByText(JavaFileType.INSTANCE, "class X { int f = \"error\"; int f() { int gg<caret> = 11; return 0;} }");
+    configureByText(JavaFileType.INSTANCE, """
+      class X {
+        int f = "error";
+        int f() {
+          return 11<caret>;
+        }
+      }""");
     HighlightInfo error = assertOneElement(highlightErrors());
     assertEquals("Incompatible types. Found: 'java.lang.String', required: 'int'", error.getDescription());
 
@@ -2186,13 +2196,18 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
           MyVerySlowAnnotator.wait.set(false);
           success.set(true);
         }
-        if (n.timedOut()) {
+        if (n.isTimedOut()) {
           MyVerySlowAnnotator.wait.set(false);
           throw new RuntimeException(new TimeoutException(ThreadDumper.dumpThreadsToString()));
         }
       };
       TextEditor textEditor = TextEditorProvider.getInstance().getTextEditor(getEditor());
-      myDaemonCodeAnalyzer.runPasses(myFile, myEditor.getDocument(), textEditor, new int[0], false, checkHighlighted);
+      try {
+        myDaemonCodeAnalyzer.runPasses(myFile, myEditor.getDocument(), textEditor, new int[0], false, checkHighlighted);
+      }
+      catch (Exception e) {
+        throw new RuntimeException(e);
+      }
 
       assertEmpty(MyVerySlowAnnotator.syntaxHighlights(markupModel, errorDescription));
       assertNotEmpty(MyVerySlowAnnotator.myHighlights(markupModel));
@@ -2323,5 +2338,79 @@ public class DaemonRespondToChangesTest extends DaemonAnalyzerTestCase {
       .filter(Objects::nonNull)
       .filter(h -> h.getSeverity() == HighlightSeverity.ERROR)
       .toList();
+  }
+
+  public void testMultiplePSIInvalidationsMustDelayTheirHighlightersRemovalForShortTimeToAvoidFlickering() {
+    //IJPL-160136 Blinking highlighting on refactoring TS code
+
+    @Language("JAVA")
+    String text = """
+      class X {
+         int xxx;
+         void foo() {
+           for (int i=0; i<xxx+1; i++) {
+              if (i == xxx) return xxx;
+           }
+         }
+         public int hashCode() {
+           return xxx;
+         }
+      }""";
+
+    DaemonAnnotatorsRespondToChangesTest.useAnnotatorsIn(JavaFileType.INSTANCE.getLanguage(), new DaemonAnnotatorsRespondToChangesTest.MyRecordingAnnotator[]{new MyXXXIdentifierAnnotator()}, ()->{
+      configureByText(JavaFileType.INSTANCE, text);
+      makeEditorWindowVisible(new Point(0, 1000), myEditor);
+
+      MarkupModelEx markupModel = (MarkupModelEx)DocumentMarkupModel.forDocument(getEditor().getDocument(), getProject(), true);
+      doHighlighting();
+      assertSize(5, MyXXXIdentifierAnnotator.myHighlights(markupModel));
+
+      List<String> events = Collections.synchronizedList(new ArrayList<>());
+      markupModel.addMarkupModelListener(getTestRootDisposable(), new MarkupModelListener() {
+        @Override
+        public void afterAdded(@NotNull RangeHighlighterEx highlighter) {
+          events.add("added " + highlighter);
+        }
+
+        @Override
+        public void afterRemoved(@NotNull RangeHighlighterEx highlighter) {
+          events.add("removed " + highlighter);
+        }
+      });
+      // invalidate all xxx (leaving the text the same), check that these highlighters are recycled
+      List<PsiIdentifier> identifiers = new ArrayList<>();
+      getFile().accept(new JavaRecursiveElementWalkingVisitor() {
+        @Override
+        public void visitIdentifier(@NotNull PsiIdentifier identifier) {
+          super.visitIdentifier(identifier);
+          if (identifier.getText().equals("xxx")) identifiers.add(identifier);
+        }
+      });
+      for (PsiIdentifier identifier : identifiers) {
+        WriteCommandAction.writeCommandAction(getProject()).run(() -> identifier.replace(PsiElementFactory.getInstance(getProject()).createIdentifier("xxx")));
+        assertFalse(identifier.isValid());
+      }
+      doHighlighting();
+      assertEmpty(events);
+    });
+  }
+  // highlight all identifiers with text "xxx"
+  public static class MyXXXIdentifierAnnotator extends DaemonAnnotatorsRespondToChangesTest.MyRecordingAnnotator {
+    private static final String MSG = "xxx?";
+
+    @Override
+    public void annotate(@NotNull PsiElement element, @NotNull AnnotationHolder holder) {
+      if (element instanceof PsiIdentifier && element.getText().equals("xxx")) {
+        holder.newAnnotation(HighlightSeverity.ERROR, MSG).range(element).create();
+        iDidIt();
+      }
+      LOG.debug(getClass()+".annotate("+element+") = "+didIDoIt());
+    }
+    static List<HighlightInfo> myHighlights(MarkupModel markupModel) {
+      return Arrays.stream(markupModel.getAllHighlighters())
+        .map(highlighter -> HighlightInfo.fromRangeHighlighter(highlighter))
+        .filter(Objects::nonNull)
+        .filter(info -> MSG.equals(info.getDescription())).toList();
+    }
   }
 }

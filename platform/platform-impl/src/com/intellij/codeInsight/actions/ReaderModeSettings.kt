@@ -7,6 +7,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.progress.blockingContext
@@ -26,6 +27,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
+
+/**
+ * Might be used for application-wide overriding of [ReaderModeSettings.kt] defaults.
+ * Useful when some product requires a different default value.
+ */
+interface ReaderModeDefaultsOverride {
+
+  companion object {
+    @JvmStatic
+    fun getInstance(): ReaderModeDefaultsOverride = ApplicationManager.getApplication().getService(ReaderModeDefaultsOverride::class.java)
+  }
+
+  val showWarningsDefault: Boolean
+}
 
 interface ReaderModeSettings : Disposable {
   companion object {
@@ -72,7 +87,7 @@ interface ReaderModeSettings : Disposable {
 
             if (matchMode || forceUpdate) {
               withContext(Dispatchers.EDT) {
-                blockingContext {
+                writeIntentReadAction {
                   applyModeChanged(project = project, editor = editor, matchMode = matchMode, fileIsOpenAlready = fileIsOpenAlready)
                 }
               }

@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import com.intellij.execution.target.*
 import com.intellij.openapi.progress.*
 import com.intellij.openapi.projectRoots.Sdk
+import com.jetbrains.extensions.failure
 import com.jetbrains.python.psi.LanguageLevel
 import com.jetbrains.python.sdk.add.target.conda.TargetCommandExecutor
 import com.jetbrains.python.sdk.add.target.conda.createCondaSdkFromExistingEnv
@@ -38,7 +39,8 @@ data class PyCondaEnv(
      * @return unparsed output of conda info --envs --json
      */
     private suspend fun getEnvsInfo(command: TargetCommandExecutor, fullCondaPathOnTarget: FullPathOnTarget): Result<String> {
-      return runCatching { command.execute(listOf(fullCondaPathOnTarget, "info", "--envs", "--json")).thenApply { it.stdout }.await() }
+      val output = command.execute(listOf(fullCondaPathOnTarget, "info", "--envs", "--json")).await()
+      return if (output.exitCode == 0) Result.success(output.stdout) else failure(output.stderr)
     }
 
     /**
@@ -205,6 +207,6 @@ sealed class NewCondaEnvRequest {
     }
     override val envName: String get() = lazyName.value
 
-    override val createEnvArguments: Array<String> = arrayOf("env", "create", "--force", "-f", environmentYaml.toFile().path)
+    override val createEnvArguments: Array<String> = arrayOf("env", "create", "-y", "-f", environmentYaml.toFile().path)
   }
 }

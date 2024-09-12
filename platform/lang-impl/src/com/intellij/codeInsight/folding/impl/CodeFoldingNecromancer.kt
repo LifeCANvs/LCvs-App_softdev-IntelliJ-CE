@@ -5,6 +5,7 @@ import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
@@ -15,6 +16,8 @@ import com.intellij.openapi.fileEditor.impl.text.catchingExceptions
 import com.intellij.openapi.progress.blockingContextToIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
+import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer.MarkupType
 import com.intellij.psi.PsiCompiledFile
 import com.intellij.psi.PsiDocumentManager
 import kotlinx.coroutines.CoroutineScope
@@ -53,10 +56,13 @@ private class CodeFoldingNecromancer(
         isNotCompiledFile(recipe.project, recipe.document)) {
       val editor = recipe.editorSupplier()
       withContext(Dispatchers.EDT) {
-        if (recipe.isValid(editor) &&
-            editor.foldingModel.isFoldingEnabled &&
-            !CodeFoldingManagerImpl.isFoldingsInitializedInEditor(editor)) {
-          zombie.applyState(document, editor.foldingModel)
+        writeIntentReadAction {
+          if (recipe.isValid(editor) &&
+              editor.foldingModel.isFoldingEnabled &&
+              !CodeFoldingManagerImpl.isFoldingsInitializedInEditor(editor)) {
+            zombie.applyState(document, editor.foldingModel)
+            FUSProjectHotStartUpMeasurer.markupRestored(recipe, MarkupType.CODE_FOLDING)
+          }
         }
       }
     } else {

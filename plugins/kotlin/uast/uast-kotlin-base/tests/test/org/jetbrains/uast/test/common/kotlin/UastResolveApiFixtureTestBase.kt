@@ -10,7 +10,6 @@ import com.intellij.platform.uast.testFramework.env.findUElementByTextFromPsi
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.PsiClassReferenceType
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.util.parentOfType
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.fixtures.JavaCodeInsightTestFixture
 import com.intellij.testFramework.replaceService
@@ -399,7 +398,52 @@ interface UastResolveApiFixtureTestBase {
         TestCase.assertEquals(PsiTypes.intType(), functionCall.getExpressionType())
     }
 
-    fun checkLocalResolve(myFixture: JavaCodeInsightTestFixture) {
+    fun checkLocalResolve_class(myFixture: JavaCodeInsightTestFixture) {
+        myFixture.configureByText(
+            "main.kt", """
+                fun test() {
+                  class LocalClass(i: Int)
+                  
+                  val lc = LocalClass(42)
+                  
+                  class LocalClassWithImplicitConstructor
+                  
+                  val lcwic = LocalClassWithImplicitConstructor()
+                  
+                  class LocalClassWithGeneric<T>(t: T)
+                  
+                  val lgc = LocalClassWithGeneric<String>("hi")
+                }
+            """.trimIndent()
+        )
+        myFixture.file.toUElement()!!.accept(
+            object : AbstractUastVisitor() {
+                override fun visitCallExpression(node: UCallExpression): Boolean {
+                    val resolved = node.resolve()
+                    TestCase.assertNotNull(resolved)
+                    TestCase.assertTrue(resolved!!.isConstructor)
+
+                    val resolvedViaReference = node.classReference?.resolve()
+                    TestCase.assertNotNull(resolvedViaReference)
+                    TestCase.assertTrue(resolvedViaReference is PsiClass)
+                    TestCase.assertTrue((resolvedViaReference as PsiClass).name?.startsWith("LocalClass") == true)
+
+                    // KTIJ-17870
+                    val type = node.getExpressionType()
+                    TestCase.assertTrue(type is PsiClassType)
+                    TestCase.assertTrue((type as PsiClassType).name.startsWith("LocalClass"))
+                    val resolvedFromType = type.resolve()
+                    TestCase.assertNotNull(resolvedFromType)
+                    TestCase.assertTrue(resolvedFromType is PsiClass)
+                    TestCase.assertTrue((resolvedFromType as PsiClass).name?.startsWith("LocalClass") == true)
+
+                    return super.visitCallExpression(node)
+                }
+            }
+        )
+    }
+
+    fun checkLocalResolve_function(myFixture: JavaCodeInsightTestFixture) {
         myFixture.configureByText(
             "MyClass.kt", """
             fun foo() {
@@ -983,6 +1027,50 @@ interface UastResolveApiFixtureTestBase {
             TestCase.assertNotNull(arg)
             TestCase.assertTrue(arg is UCallableReferenceExpression)
             TestCase.assertEquals("uiMethod", (arg as UCallableReferenceExpression).callableName)
+        }
+    }
+
+    fun checkParameterForArgument_extensionReceiver_suspend(myFixture: JavaCodeInsightTestFixture) {
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "test/pkg/HttpClient.kt", """
+                interface HttpClient
+
+                interface HttpRequestBuilder
+
+                interface DefaultClientWebSocketSession
+
+                public suspend fun HttpClient.webSocket(
+                    request: HttpRequestBuilder.() -> Unit,
+                    block: suspend DefaultClientWebSocketSession.() -> Unit
+                ) {}
+
+                public suspend fun HttpClient.webSocket(
+                    urlString: String,
+                    request: HttpRequestBuilder.() -> Unit = {},
+                    block: suspend DefaultClientWebSocketSession.() -> Unit
+                ) {}
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                import test.pkg.*
+
+                suspend fun bar(client: HttpClient) {
+                    client.web<caret>Socket("http://localhost/abc") {}
+                }
+            """.trimIndent()
+        )
+
+        try {
+            val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression()
+                .orFail("cant convert to UCallExpression")
+            val arg = uCallExpression.getArgumentForParameter(1)
+                .orFail("cant get the first argument (except for the extension receiver)")
+            val psiParam = uCallExpression.getParameterForArgument(arg)
+            TestCase.assertNotNull(psiParam)
+            TestCase.assertEquals("urlString", psiParam!!.name)
+        } finally {
+          mockLibraryFacility.tearDown(myFixture.module)
         }
     }
 
@@ -2549,6 +2637,99 @@ interface UastResolveApiFixtureTestBase {
             TestCase.assertEquals("ownPropSetter", resolved!!.name)
         } finally {
             mockLibraryFacility.tearDown(myFixture.module)
+        }
+    }
+
+    fun checkResolveProtoDSL(myFixture: JavaCodeInsightTestFixture, isK2: Boolean) {
+        // Generated by the protocol buffer compiler for the following proto
+        //
+        // message ProtoObject {
+        //   ProtoType proto_type = 1;
+        // }
+        //
+        // enum ProtoType {
+        //   option features.enum_type = CLOSED;
+        //
+        //   PROTO_TYPE_UNKNOWN = 0;
+        //   PROTO_TYPE_A = 1;
+        //   PROTO_TYPE_B = 2;
+        //   PROTO_TYPE_C = 3;
+        // }
+        val mockLibraryFacility = myFixture.configureLibraryByText(
+            "test/pkg/proto.kt", """
+                package test.pkg
+
+                @kotlin.jvm.JvmName("-initializeprotoObject")
+                public inline fun protoObject(block: ProtoObjectKt.Dsl.() -> kotlin.Unit): ProtoObject =
+                  ProtoObjectKt.Dsl._create(ProtoObject.newBuilder()).apply { block() }._build()
+
+                public object ProtoObjectKt {
+                  public class Dsl private constructor(
+                    private val _builder: ProtoObject.Builder
+                  ) {
+                    public companion object {
+                      @kotlin.jvm.JvmSynthetic
+                      @kotlin.PublishedApi
+                      internal fun _create(builder: ProtoObject.Builder): Dsl = Dsl(builder)
+                    }
+
+                    @kotlin.jvm.JvmSynthetic
+                    @kotlin.PublishedApi
+                    internal fun _build(): ProtoObject = _builder.build()
+
+                    public var protoType: ProtoType
+                      @JvmName("getProtoType")
+                      get() = _builder.protoType
+                      @JvmName("setProtoType")
+                      set(value) {
+                        _builder.protoType = value
+                      }
+                  }
+                }
+
+                // mimic Java counterpart
+                class ProtoObject {
+                  companion object {
+                    fun newBuilder(): Builder = Builder()
+                  }
+                  class Builder {
+                    fun build(): ProtoObject = ProtoObject()
+                    internal var protoType: ProtoType = ProtoType.PROTO_TYPE_UNKNOWN
+                  }
+                }
+
+                // mimic Java counterpart
+                enum class ProtoType {
+                  PROTO_TYPE_UNKNOWN, PROTO_TYPE_A, PROTO_TYPE_B;
+                }
+            """.trimIndent()
+        )
+        myFixture.configureByText(
+            "main.kt", """
+                import test.pkg.*
+                
+                fun test() {
+                  val protoObject = protoObject {
+                    protoType <caret>= ProtoType.PROTO_TYPE_A
+                  }
+                }
+            """.trimIndent()
+        )
+        try {
+            val eq = myFixture.file.findElementAt(myFixture.caretOffset).toUElement()?.getParentOfType<UBinaryExpression>()
+                .orFail("cant convert to UBinaryExpression")
+            val resolvedOp = eq.resolveOperator()
+            if (isK2) {
+                TestCase.assertNotNull(resolvedOp)
+                TestCase.assertEquals("setProtoType", resolvedOp!!.name)
+            } else {
+                TestCase.assertNull(resolvedOp)
+            }
+            val resolvedLHS = (eq.leftOperand as USimpleNameReferenceExpression).resolve() as? PsiMethod
+            TestCase.assertNotNull(resolvedLHS)
+            TestCase.assertEquals("setProtoType", resolvedLHS!!.name)
+        } finally {
+          mockLibraryFacility.tearDown(myFixture.module)
         }
     }
 

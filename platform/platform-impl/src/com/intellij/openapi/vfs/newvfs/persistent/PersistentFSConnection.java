@@ -25,15 +25,11 @@ import com.intellij.util.io.DataEnumerator;
 import com.intellij.util.io.ScannableDataEnumeratorEx;
 import com.intellij.util.io.SimpleStringPersistentEnumerator;
 import com.intellij.util.io.StorageLockContext;
-import com.intellij.util.io.storage.CapacityAllocationPolicy;
 import com.intellij.util.io.storage.HeavyProcessLatch;
 import com.intellij.util.io.storage.VFSContentStorage;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.TestOnly;
+import org.jetbrains.annotations.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -58,9 +54,6 @@ import static java.util.concurrent.TimeUnit.*;
 @ApiStatus.Internal
 public final class PersistentFSConnection {
   private static final Logger LOG = Logger.getInstance(PersistentFSConnection.class);
-
-  static final int RESERVED_ATTR_ID = DataEnumerator.NULL_ID;
-  static final AttrPageAwareCapacityAllocationPolicy REASONABLY_SMALL = new AttrPageAwareCapacityAllocationPolicy();
 
   /**
    * After how many errors ('corruptions') insist on restarting IDE? I.e. we schedule
@@ -88,7 +81,6 @@ public final class PersistentFSConnection {
    */
   private final @NotNull SimpleStringPersistentEnumerator enumeratedAttributes;
 
-  private volatile boolean dirty = false;
   private volatile boolean closed = false;
 
   /** How many errors were detected (during the use) that are likely caused by VFS corruptions -- i.e. broken internal invariants */
@@ -121,37 +113,46 @@ public final class PersistentFSConnection {
     recoveryInfo = info;
   }
 
-  @NotNull("Vfs must be initialized")
-  SimpleStringPersistentEnumerator getEnumeratedAttributes() {
+  @NotNull DataEnumerator<String> attributesEnumerator() {
     return enumeratedAttributes;
   }
 
-  @NotNull
-  VFSContentStorage getContents() {
+  int enumerateAttributeId(@NotNull String attributeId) {
+    int enumeratedAttributeId = enumeratedAttributes.enumerate(attributeId);
+    if (enumeratedAttributeId > VFSAttributesStorage.MAX_ATTRIBUTE_ID) {
+      throw new IllegalStateException(
+        "attribute[" + attributeId + "] assigned id[" + enumeratedAttributeId + "] which is above max " +
+        VFSAttributesStorage.MAX_ATTRIBUTE_ID +
+        ". Current list of attributes: " + enumeratedAttributes.dumpToString()
+      );
+    }
+    return enumeratedAttributeId;
+  }
+
+  @NotNull VFSContentStorage contents() {
     return contentStorage;
   }
 
-  @NotNull
-  VFSAttributesStorage getAttributes() {
+  @NotNull VFSAttributesStorage attributes() {
     return attributesStorage;
   }
 
-  public @NotNull ScannableDataEnumeratorEx<String> getNames() {
+  @VisibleForTesting
+  public @NotNull ScannableDataEnumeratorEx<String> names() {
     return namesEnumerator;
   }
 
-  public @NotNull PersistentFSRecordsStorage getRecords() {
+  public @NotNull PersistentFSRecordsStorage records() {
     return records;
   }
 
-  @NotNull
-  IntList getFreeRecords() {
+  @NotNull IntList freeRecords() {
     synchronized (freeRecords) {
       return new IntArrayList(freeRecords.getValue());
     }
   }
 
-  long getTimestamp() throws IOException {
+  long creationTimestamp() throws IOException {
     return records.getTimestamp();
   }
 
@@ -171,43 +172,22 @@ public final class PersistentFSConnection {
   }
 
   @TestOnly
-  int getPersistentModCount() {
+  int persistentModCount() {
     return records.getGlobalModCount();
   }
 
-  void markDirty() throws IOException {
-    if (!dirty) {
-      dirty = true;
-    }
-  }
-
-  private void resetDirty() {
-    // no synchronization, it's ok to have race here
-    if (dirty) {
-      dirty = false;
-    }
-  }
-
-  void doForce() throws IOException {
-    if (namesEnumerator instanceof Forceable) {
-      ((Forceable)namesEnumerator).force();
-    }
-    attributesStorage.force();
-    contentStorage.force();
-    resetDirty();
-    records.force();
-  }
-
   public boolean isDirty() {
-    return dirty
+    return records.isDirty()
            || ((Forceable)namesEnumerator).isDirty()
            || attributesStorage.isDirty()
-           || contentStorage.isDirty()
-           || records.isDirty();
+           || contentStorage.isDirty();
   }
 
-  int corruptionsDetected() {
-    return corruptionsDetected.get();
+  void force() throws IOException {
+    ((Forceable)namesEnumerator).force();//checked to be a Forceable in ctor
+    attributesStorage.force();
+    contentStorage.force();
+    records.force();
   }
 
   synchronized void close() throws IOException {
@@ -215,7 +195,7 @@ public final class PersistentFSConnection {
       return;
     }
 
-    doForce();
+    force();
 
     //ensure async loading is finished
     Exception freeRecordsLoadingError = ExceptionUtil.runAndCatch(() -> freeRecords.getValue());
@@ -231,18 +211,16 @@ public final class PersistentFSConnection {
   }
 
 
-  public @NotNull PersistentFSPaths getPersistentFSPaths() {
+  public @NotNull PersistentFSPaths paths() {
     return persistentFSPaths;
   }
 
-  /**
-   * Method used to mark file record modified if something _derived_ is modified -- i.e. children attribute
-   * or content. If file record _fields_ are mutated directly -- record marked as modified automatically, no
-   * need to call this method.
-   */
-  public void markRecordAsModified(int fileId) throws IOException {
-    getRecords().markRecordAsModified(fileId);
-    markDirty();
+  int corruptionsDetected() {
+    return corruptionsDetected.get();
+  }
+
+  public @NotNull VFSRecoveryInfo recoveryInfo() {
+    return recoveryInfo;
   }
 
   static void closeStorages(@Nullable PersistentFSRecordsStorage records,
@@ -266,18 +244,6 @@ public final class PersistentFSConnection {
     }
   }
 
-  int getAttributeId(@NotNull String attributeId) {
-    int enumeratedAttributeId = enumeratedAttributes.enumerate(attributeId);
-    if (enumeratedAttributeId > VFSAttributesStorage.MAX_ATTRIBUTE_ID) {
-      throw new IllegalStateException(
-        "attribute[" + attributeId + "] assigned id[" + enumeratedAttributeId + "] which is above max " +
-        VFSAttributesStorage.MAX_ATTRIBUTE_ID +
-        ". Current list of attributes: " + enumeratedAttributes.dumpToString()
-      );
-    }
-    return enumeratedAttributeId;
-  }
-
   private final ThreadSafeThrottler corruptionNotificationThrottler = new ThreadSafeThrottler(5, MINUTES);
 
   void markAsCorruptedAndScheduleRebuild(@NotNull Throwable cause) throws RuntimeException, Error {
@@ -288,14 +254,14 @@ public final class PersistentFSConnection {
         //Persist ErrorsAccumulated.
         // No need to force() on each error -- we don't bother not persist exact count of errors,
         // but we do want to persist (errors > 0) transition:
-        doForce();
+        force();
       }
       corruptionNotificationThrottler.runThrottled(System.nanoTime(), () -> {
         Application app = ApplicationManager.getApplication();
-          if (app != null && !app.isHeadlessEnvironment()) {
-            boolean insistRestart = (corruptions >= INSIST_TO_RESTART_AFTER_ERRORS_COUNT);
-            showCorruptionNotification(insistRestart);
-          }
+        if (app != null && !app.isHeadlessEnvironment()) {
+          boolean insistRestart = (corruptions >= INSIST_TO_RESTART_AFTER_ERRORS_COUNT);
+          showCorruptionNotification(insistRestart);
+        }
       });
     }
     catch (IOException ioException) {
@@ -341,19 +307,6 @@ public final class PersistentFSConnection {
     scheduleVFSRebuild(persistentFSPaths.getCorruptionMarkerFile(), message, errorCause);
   }
 
-  public @NotNull VFSRecoveryInfo recoveryInfo() {
-    return recoveryInfo;
-  }
-
-
-  static final class AttrPageAwareCapacityAllocationPolicy extends CapacityAllocationPolicy {
-    boolean attrPageRequested;
-
-    @Override
-    public int calculateCapacity(int requiredLength) {   // 20% for growth
-      return Math.max(attrPageRequested ? 8 : 32, Math.min((int)(requiredLength * 1.2), (requiredLength / 1024 + 1) * 1024));
-    }
-  }
 
   /**
    * @param id - file id, name id, any other positive id
@@ -426,7 +379,7 @@ public final class PersistentFSConnection {
       if (lastModCount == connection.records.getGlobalModCount()) {
         if (connection.isDirty() && !HeavyProcessLatch.INSTANCE.isRunning()) {
           try {
-            connection.doForce();
+            connection.force();
           }
           catch (AlreadyDisposedException | RejectedExecutionException e) {
             LOG.warn("Stop flushing: pool is shutting down or whole application is closing", e);

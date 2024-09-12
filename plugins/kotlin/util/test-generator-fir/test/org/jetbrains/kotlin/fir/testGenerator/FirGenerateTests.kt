@@ -80,11 +80,14 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K2) {
     generateK2CodeInsightTests()
     generateK2NavigationTests()
     generateK2DebuggerTests()
+    generateK2ComposeDebuggerTests()
     generateK2HighlighterTests()
     generateK2GradleBuildScriptHighlighterTests()
     generateK2RefactoringsTests()
     generateK2SearchTests()
     generateK2RefIndexTests()
+    generateK2AnalysisApiTests()
+    generateK2InjectionTests()
 
     testGroup("base/fir/analysis-api-platform") {
         testClass<AbstractProjectWideOutOfBlockKotlinModificationTrackerTest> {
@@ -253,6 +256,10 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K2) {
             model("../../idea-fir/testData/completion/basic/common", testClassName = "CommonFir")
         }
 
+        testClass<AbstractK2JvmBasicCompletionFullJdkTest> {
+            model("basic/fullJdk", pattern = KT_WITHOUT_FIR_PREFIX)
+        }
+
         testClass<AbstractKotlinKmpCompletionTest>(
             platforms = listOf(
                 KMPTestPlatform.Js,
@@ -298,7 +305,9 @@ private fun assembleWorkspace(): TWorkspace = workspace(KotlinPluginMode.K2) {
         }
 
         testClass<AbstractK2MultiPlatformCompletionTest> {
-            model("multiPlatform", isRecursive = false, pattern = DIRECTORY)
+            model("multiPlatform/actualDeclaration", isRecursive = false, pattern = DIRECTORY)
+            model("multiPlatform/classDeclaration", isRecursive = false, pattern = DIRECTORY)
+            model("multiPlatform/functionDeclaration", isRecursive = false, pattern = DIRECTORY)
         }
 
         testClass<AbstractK2CompletionCharFilterTest> {

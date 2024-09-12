@@ -1,16 +1,19 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.codeinsight.imports
 
+import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.resolution.*
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.idea.references.*
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.withClassId
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
+import org.jetbrains.kotlin.psi.psiUtil.unwrapParenthesesLabelsAndAnnotations
 
 internal class UsedReference private constructor(val reference: KtReference) {
     fun KaSession.resolvesByNames(): Collection<Name> {
@@ -44,6 +47,7 @@ internal class UsedReference private constructor(val reference: KtReference) {
         fun KaSession.createFrom(reference: KtReference): UsedReference? {
             return when {
                 isDefaultJavaAnnotationArgumentReference(reference) -> null
+                isUnaryOperatorOnIntLiteralReference(reference) -> null
                 isEmptyInvokeReference(reference) -> null
                 else -> UsedReference(reference)
             }
@@ -88,6 +92,23 @@ internal class UsedSymbol(val reference: KtReference, val symbol: KaSymbol) {
  */
 private fun isDefaultJavaAnnotationArgumentReference(reference: KtReference): Boolean {
     return reference is KtDefaultAnnotationArgumentReference
+}
+
+/**
+ * Checks if the [reference] points to unary plus or minus operator on an [Int] literal, like `-10` or `+(20)`.
+ *
+ * Currently, such operators are not properly resolved in K2 Mode (see KT-70774).
+ */
+private fun isUnaryOperatorOnIntLiteralReference(reference: KtReference): Boolean {
+    val unaryOperationReferenceExpression = reference.element as? KtOperationReferenceExpression ?: return false
+
+    if (unaryOperationReferenceExpression.operationSignTokenType !in arrayOf(KtTokens.PLUS, KtTokens.MINUS)) return false
+
+    val prefixExpression = unaryOperationReferenceExpression.parent as? KtUnaryExpression ?: return false
+    val unwrappedBaseExpression = prefixExpression.baseExpression?.unwrapParenthesesLabelsAndAnnotations() ?: return false
+
+    return unwrappedBaseExpression is KtConstantExpression &&
+            unwrappedBaseExpression.elementType == KtNodeTypes.INTEGER_CONSTANT
 }
 
 /**
@@ -142,15 +163,15 @@ private fun KaSession.toImportableSymbol(
  */
 private fun KaSession.isDispatchedCall(
     element: KtElement,
+    symbol: KaCallableSymbol,
     dispatchReceiver: KaReceiverValue,
-    containingFile: KtFile = element.containingKtFile
 ): Boolean {
     return when (dispatchReceiver) {
         is KaExplicitReceiverValue -> true
 
-        is KaSmartCastedReceiverValue -> isDispatchedCall(element, dispatchReceiver.original, containingFile)
+        is KaSmartCastedReceiverValue -> isDispatchedCall(element, symbol, dispatchReceiver.original)
 
-        is KaImplicitReceiverValue -> !isStaticallyImportedReceiver(element, dispatchReceiver, containingFile)
+        is KaImplicitReceiverValue -> !isStaticallyImportedReceiver(element, symbol, dispatchReceiver)
     }
 }
 
@@ -158,11 +179,15 @@ private fun KaSession.isAccessibleAsMemberCallable(
     symbol: KaSymbol,
     element: KtElement,
 ): Boolean {
-    if (symbol !is KaCallableSymbol || symbol.containingSymbol !is KaClassLikeSymbol) return false
+    if (symbol !is KaCallableSymbol || containingDeclarationPatched(symbol) !is KaClassLikeSymbol) return false
+
+    if (symbol is KaEnumEntrySymbol) {
+        return isAccessibleAsMemberCallableDeclaration(symbol, element)
+    }
 
     val dispatchReceiver = resolveDispatchReceiver(element) ?: return false
 
-    return isDispatchedCall(element, dispatchReceiver)
+    return isDispatchedCall(element, symbol, dispatchReceiver)
 }
 
 /**
@@ -171,8 +196,8 @@ private fun KaSession.isAccessibleAsMemberCallable(
  */
 private fun KaSession.isStaticallyImportedReceiver(
     element: KtElement,
+    symbol: KaCallableSymbol,
     implicitDispatchReceiver: KaImplicitReceiverValue,
-    containingFile: KtFile
 ): Boolean {
     val receiverTypeSymbol = implicitDispatchReceiver.type.symbol ?: return false
     val receiverIsObject = receiverTypeSymbol is KaClassSymbol && receiverTypeSymbol.classKind.isObject
@@ -180,22 +205,11 @@ private fun KaSession.isStaticallyImportedReceiver(
     // with static imports, the implicit receiver is either some object symbol or `Unit` in case of imports from Java classes
     if (!receiverIsObject) return false
 
-    val regularImplicitReceivers = containingFile.scopeContext(element).implicitReceivers
-
-    return regularImplicitReceivers.none { it.type.semanticallyEquals(implicitDispatchReceiver.type) }
-}
-
-private fun KaSession.isAccessibleAsMemberClassifier(symbol: KaSymbol, element: KtElement): Boolean {
-    if (symbol !is KaClassLikeSymbol || symbol.containingSymbol !is KaClassLikeSymbol) return false
-
-    val name = symbol.name ?: return false
-
-    val nonImportingScopes = nonImportingScopesForPosition(element).asCompositeScope()
-
-    val foundClasses = nonImportingScopes.classifiers(name)
-    val foundClass = foundClasses.firstOrNull()
-
-    return symbol == foundClass
+    return if (symbol.isJavaStaticDeclaration()) {
+        !isAccessibleAsMemberCallableDeclaration(symbol, element)
+    } else {
+        !typeIsPresentAsImplicitReceiver(implicitDispatchReceiver.type, element)
+    }
 }
 
 private fun KaSession.resolveDispatchReceiver(element: KtElement): KaReceiverValue? {

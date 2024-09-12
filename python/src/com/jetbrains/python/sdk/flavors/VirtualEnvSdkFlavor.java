@@ -11,6 +11,7 @@ import com.jetbrains.python.icons.PythonIcons;
 import com.jetbrains.python.sdk.BasePySdkExtKt;
 import com.jetbrains.python.sdk.PySdkExtKt;
 import com.jetbrains.python.sdk.PythonSdkUtil;
+import com.jetbrains.python.sdk.VirtualEnvReader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -75,9 +76,12 @@ public final class VirtualEnvSdkFlavor extends CPythonSdkFlavor<PyFlavorData.Emp
   }
 
   @Override
-  public boolean isValidSdkPath(@NotNull File file) {
-    if (!super.isValidSdkPath(file)) return false;
-    return PythonSdkUtil.getVirtualEnvRoot(file.getPath()) != null;
+  public boolean isValidSdkPath(@NotNull Path path) {
+    if (!super.isValidSdkPath(path)) {
+      return false;
+    }
+
+    return PythonSdkUtil.getVirtualEnvRoot(path.toString()) != null;
   }
 
   @Override

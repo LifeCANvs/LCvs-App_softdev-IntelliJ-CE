@@ -28,8 +28,9 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.impl.compiled.ClsFileImpl
 import com.intellij.testFramework.IdeaTestUtil
 import com.intellij.testFramework.PlatformTestUtil
-import com.intellij.tools.ide.metrics.benchmark.Benchmark
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase
+import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase.*
+import com.intellij.tools.ide.metrics.benchmark.Benchmark
 import com.intellij.util.SystemProperties
 import com.intellij.util.io.URLUtil
 import com.intellij.util.lang.JavaVersion
@@ -117,6 +118,39 @@ class IdeaDecompilerTest : LightJavaCodeInsightFixtureTestCase() {
       val infos = myFixture.doHighlighting()
       assertTrue(infos.toString(), infos.all { info: HighlightInfo -> info.severity === HighlightInfoType.SYMBOL_TYPE_SEVERITY })
       assertEquals(68, infos.size)
+    })
+  }
+
+  fun testNameHighlightingInsideCompiledModuleFile() {
+    myFixture.setReadEditorMarkupModel(true)
+    myFixture.openFileInEditor(getTestFile("module-info.class"))
+    IdentifierHighlighterPassFactory.doWithHighlightingEnabled(project, testRootDisposable, Runnable {
+      val infos = myFixture.doHighlighting()
+        .filter { it.severity === HighlightInfoType.SYMBOL_TYPE_SEVERITY }
+      assertEquals(5, infos.size)
+      val texts = infos.map { it.text }.toSet()
+      assertContainsElements(texts,
+                             "module",
+                             "requires",
+                             "exports",
+      )
+    })
+  }
+
+  fun testNameHighlightingInsideCompiledFileWithRecords() {
+    myFixture.setReadEditorMarkupModel(true)
+    val testFile = getTestFile("RecordHighlighting.class")
+    testFile.parent.children ; testFile.parent.refresh(false, true)  // inner classes
+    myFixture.openFileInEditor(testFile)
+    IdentifierHighlighterPassFactory.doWithHighlightingEnabled(project, testRootDisposable, Runnable {
+      val infos = myFixture.doHighlighting()
+        .filter { it.severity === HighlightInfoType.SYMBOL_TYPE_SEVERITY }
+      val texts = infos.map { it.text }.toSet()
+      assertContainsElements(texts,
+                             "sealed",
+                             "record",
+                             "permits",
+      )
     })
   }
 

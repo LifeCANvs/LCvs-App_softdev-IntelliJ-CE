@@ -92,3 +92,7 @@ internal fun TerminalOutputModel.getBlockBounds(block: CommandBlock): Rectangle 
   val width = editor.scrollingModel.visibleArea.width - TerminalUi.cornerToBlockInset
   return Rectangle(0, topY, width, bottomY - topY)
 }
+
+internal fun TerminalOutputModel.isErrorBlock(block: CommandBlock): Boolean {
+  return getBlockInfo(block).let { it != null && it.exitCode != 0 }
+}

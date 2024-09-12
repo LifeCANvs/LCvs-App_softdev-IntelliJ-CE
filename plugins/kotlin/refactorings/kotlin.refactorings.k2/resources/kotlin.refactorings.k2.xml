@@ -31,12 +31,18 @@
             language="kotlin"
             implementationClass="org.jetbrains.kotlin.idea.k2.refactoring.suggested.KotlinSuggestedRefactoringSupport"/>
 
+    <refactoring.introduceParameterMethodUsagesProcessor
+            implementation="org.jetbrains.kotlin.idea.k2.refactoring.introduceParameter.KotlinIntroduceParameterMethodUsageProcessor"/>
+
     <java.changeSignature.converter language="kotlin" implementationClass="org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.KotlinJavaChangeInfoConverter"/>
     <changeSignature.usageProvider language="kotlin" implementationClass="org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.KotlinChangeSignatureUsageProvider"/>
     <inlineActionHandler implementation="org.jetbrains.kotlin.idea.k2.refactoring.inline.KotlinInlinePropertyHandler"/>
     <inlineActionHandler implementation="org.jetbrains.kotlin.idea.k2.refactoring.inline.KotlinInlineFunctionHandler"/>
     <inlineActionHandler implementation="org.jetbrains.kotlin.idea.k2.refactoring.inline.KotlinInlineAnonymousFunctionHandler"/>
     <inlineActionHandler implementation="org.jetbrains.kotlin.idea.k2.refactoring.inline.KotlinInlineTypeAliasHandler"/>
+    <refactoring.inlineHandler
+            language="kotlin"
+            implementationClass="org.jetbrains.kotlin.idea.k2.refactoring.inline.JavaToKotlinInlineHandler"/>
 
     <refactoring.copyHandler
             id="kotlinClass"

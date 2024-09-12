@@ -122,7 +122,10 @@ public class JBLabel extends JLabel implements AnchorableComponent, JBComponent<
 
   @Override
   public void setAnchor(@Nullable JComponent anchor) {
-    myAnchor = anchor;
+    if (this.myAnchor != anchor) {
+      myAnchor = anchor;
+      invalidate();
+    }
   }
 
   @Override
@@ -347,6 +350,7 @@ public class JBLabel extends JLabel implements AnchorableComponent, JBComponent<
         if (myEditorPane.getCaret() instanceof DefaultCaret) {
           ((DefaultCaret)myEditorPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
         }
+        myEditorPane.setToolTipText(getToolTipText());
         myEditorPane.setText(getText());
         checkMultiline();
         myEditorPane.setCaretPosition(0);
@@ -434,5 +438,13 @@ public class JBLabel extends JLabel implements AnchorableComponent, JBComponent<
   public JBLabel andOpaque() {
     setOpaque(true);
     return this;
+  }
+
+  @Override
+  public void setToolTipText(@Nullable @NlsContexts.Tooltip String text) {
+    super.setToolTipText(text);
+    if (myEditorPane != null) {
+      myEditorPane.setToolTipText(text);
+    }
   }
 }

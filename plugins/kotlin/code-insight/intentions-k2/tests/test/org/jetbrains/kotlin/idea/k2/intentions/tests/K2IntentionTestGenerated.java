@@ -1082,6 +1082,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
                 runTest("../../../idea/tests/testData/intentions/addPropertyAccessors/setter/local.kt");
             }
 
+            @TestMetadata("noGetter.kt")
+            public void testNoGetter() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addPropertyAccessors/setter/noGetter.kt");
+            }
+
             @TestMetadata("noType.kt")
             public void testNoType() throws Exception {
                 runTest("../../../idea/tests/testData/intentions/addPropertyAccessors/setter/noType.kt");
@@ -3198,6 +3203,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
             runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/kt11295.kt");
         }
 
+        @TestMetadata("ktij30491.kt")
+        public void testKtij30491() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/ktij30491.kt");
+        }
+
         @TestMetadata("lambdaInParentheses.kt")
         public void testLambdaInParentheses() throws Exception {
             runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/lambdaInParentheses.kt");
@@ -3216,6 +3226,16 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("longTemplatePlusStringLiteral.kt")
         public void testLongTemplatePlusStringLiteral() throws Exception {
             runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/longTemplatePlusStringLiteral.kt");
+        }
+
+        @TestMetadata("manyPlusesWithMultiDollarBeginning.kt")
+        public void testManyPlusesWithMultiDollarBeginning() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/manyPlusesWithMultiDollarBeginning.kt");
+        }
+
+        @TestMetadata("manyPlusesWithMultiDollarEnd.kt")
+        public void testManyPlusesWithMultiDollarEnd() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertToStringTemplate/manyPlusesWithMultiDollarEnd.kt");
         }
 
         @TestMetadata("multilineString.kt")
@@ -5161,6 +5181,11 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
         @TestMetadata("consecutiveBreaks.kt")
         public void testConsecutiveBreaks() throws Exception {
             runTest("../../../idea/tests/testData/intentions/convertToRawStringTemplate/consecutiveBreaks.kt");
+        }
+
+        @TestMetadata("multiDollar.kt")
+        public void testMultiDollar() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertToRawStringTemplate/multiDollar.kt");
         }
 
         @TestMetadata("octalEscape.kt")
@@ -7322,7 +7347,99 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter")
+    public static class ConvertPropertyInitializerToGetter extends AbstractK2IntentionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("const.kt")
+        public void testConst() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/const.kt");
+        }
+
+        @TestMetadata("errorType.kt")
+        public void testErrorType() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/errorType.kt");
+        }
+
+        @TestMetadata("hasReferenceToPrimaryCtorParameter.kt")
+        public void testHasReferenceToPrimaryCtorParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/hasReferenceToPrimaryCtorParameter.kt");
+        }
+
+        @TestMetadata("hasReferenceToPrimaryCtorProperty.kt")
+        public void testHasReferenceToPrimaryCtorProperty() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/hasReferenceToPrimaryCtorProperty.kt");
+        }
+
+        @TestMetadata("inapplicableIfExtensionProperty.kt")
+        public void testInapplicableIfExtensionProperty() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/inapplicableIfExtensionProperty.kt");
+        }
+
+        @TestMetadata("inapplicableIfLocalVariableInFun.kt")
+        public void testInapplicableIfLocalVariableInFun() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/inapplicableIfLocalVariableInFun.kt");
+        }
+
+        @TestMetadata("inapplicableIfLocalVariableInInitBlock.kt")
+        public void testInapplicableIfLocalVariableInInitBlock() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/inapplicableIfLocalVariableInInitBlock.kt");
+        }
+
+        @TestMetadata("inapplicableIfNoInitializer.kt")
+        public void testInapplicableIfNoInitializer() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/inapplicableIfNoInitializer.kt");
+        }
+
+        @TestMetadata("jvmField.kt")
+        public void testJvmField() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/jvmField.kt");
+        }
+
+        @TestMetadata("notInLambda.kt")
+        public void testNotInLambda() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/notInLambda.kt");
+        }
+
+        @TestMetadata("onPropertyName.kt")
+        public void testOnPropertyName() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/onPropertyName.kt");
+        }
+
+        @TestMetadata("otherPackageType.kt")
+        public void testOtherPackageType() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/otherPackageType.kt");
+        }
+
+        @TestMetadata("propertyWithInitializerWithSetter.kt")
+        public void testPropertyWithInitializerWithSetter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/propertyWithInitializerWithSetter.kt");
+        }
+
+        @TestMetadata("propertyWithInitializerWithoutAccessors.kt")
+        public void testPropertyWithInitializerWithoutAccessors() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/propertyWithInitializerWithoutAccessors.kt");
+        }
+
+        @TestMetadata("semicolon.kt")
+        public void testSemicolon() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/semicolon.kt");
+        }
+
+        @TestMetadata("topLevelDeclaration.kt")
+        public void testTopLevelDeclaration() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/convertPropertyInitializerToGetter/topLevelDeclaration.kt");
+        }
+    }
 
 
 
@@ -7592,7 +7709,634 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget")
+    public abstract static class AddAnnotationUseSiteTarget extends AbstractK2IntentionTest {
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor")
+        public abstract static class Constructor extends AbstractK2IntentionTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor")
+            public static class Uncategorized extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
 
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("parameter.kt")
+                public void testParameter() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/parameter.kt");
+                }
+
+                @TestMetadata("secondary.kt")
+                public void testSecondary() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/secondary.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val")
+            public static class Val extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/val/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var")
+            public static class Var extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/constructor/var/setparam.kt");
+                }
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension")
+        public abstract static class Extension extends AbstractK2IntentionTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function")
+            public static class Function extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/function/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property")
+            public static class Property extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/extension/property/setparam.kt");
+                }
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property")
+        public abstract static class Property extends AbstractK2IntentionTest {
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate")
+            public static class Delegate extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/delegate/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property")
+            public static class Uncategorized extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("local.kt")
+                public void testLocal() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/local.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val")
+            public static class Val extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/val/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking")
+            public static class ValNoBacking extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/valNoBacking/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var")
+            public static class Var extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/var/setparam.kt");
+                }
+            }
+
+            @RunWith(JUnit3RunnerWithInners.class)
+            @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking")
+            public static class VarNoBacking extends AbstractK2IntentionTest {
+                @java.lang.Override
+                @org.jetbrains.annotations.NotNull
+                public final KotlinPluginMode getPluginMode() {
+                    return KotlinPluginMode.K2;
+                }
+
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                @TestMetadata("delegate.kt")
+                public void testDelegate() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/delegate.kt");
+                }
+
+                @TestMetadata("field.kt")
+                public void testField() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/field.kt");
+                }
+
+                @TestMetadata("file.kt")
+                public void testFile() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/file.kt");
+                }
+
+                @TestMetadata("get.kt")
+                public void testGet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/get.kt");
+                }
+
+                @TestMetadata("param.kt")
+                public void testParam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/param.kt");
+                }
+
+                @TestMetadata("property.kt")
+                public void testProperty() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/property.kt");
+                }
+
+                @TestMetadata("receiver.kt")
+                public void testReceiver() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/receiver.kt");
+                }
+
+                @TestMetadata("set.kt")
+                public void testSet() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/set.kt");
+                }
+
+                @TestMetadata("setparam.kt")
+                public void testSetparam() throws Exception {
+                    runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/property/varNoBacking/setparam.kt");
+                }
+            }
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget")
+        public static class Uncategorized extends AbstractK2IntentionTest {
+            @java.lang.Override
+            @org.jetbrains.annotations.NotNull
+            public final KotlinPluginMode getPluginMode() {
+                return KotlinPluginMode.K2;
+            }
+
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("hasAnnotationArgs.kt")
+            public void testHasAnnotationArgs() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/hasAnnotationArgs.kt");
+            }
+
+            @TestMetadata("hasTarget1.kt")
+            public void testHasTarget1() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/hasTarget1.kt");
+            }
+
+            @TestMetadata("hasTarget2.kt")
+            public void testHasTarget2() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/hasTarget2.kt");
+            }
+
+            @TestMetadata("hasTarget3.kt")
+            public void testHasTarget3() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/hasTarget3.kt");
+            }
+
+            @TestMetadata("qualifiedAnnotationDoesNotLoseQualifier.kt")
+            public void testQualifiedAnnotationDoesNotLoseQualifier() throws Exception {
+                runTest("../../../idea/tests/testData/intentions/addAnnotationUseSiteTarget/qualifiedAnnotationDoesNotLoseQualifier.kt");
+            }
+        }
+    }
 
 
 
@@ -9635,7 +10379,79 @@ public abstract class K2IntentionTestGenerated extends AbstractK2IntentionTest {
 
 
 
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../idea/tests/testData/intentions/addValOrVar")
+    public static class AddValOrVar extends AbstractK2IntentionTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
 
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("actualClass.kt")
+        public void testActualClass() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/actualClass.kt");
+        }
+
+        @TestMetadata("addVal.kt")
+        public void testAddVal() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/addVal.kt");
+        }
+
+        @TestMetadata("dataClass.kt")
+        public void testDataClass() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/dataClass.kt");
+        }
+
+        @TestMetadata("expectAnnotation.kt")
+        public void testExpectAnnotation() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/expectAnnotation.kt");
+        }
+
+        @TestMetadata("expectClass.kt")
+        public void testExpectClass() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/expectClass.kt");
+        }
+
+        @TestMetadata("expectClass2.kt")
+        public void testExpectClass2() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/expectClass2.kt");
+        }
+
+        @TestMetadata("expectInlineClass.kt")
+        public void testExpectInlineClass() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/expectInlineClass.kt");
+        }
+
+        @TestMetadata("funParameter.kt")
+        public void testFunParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/funParameter.kt");
+        }
+
+        @TestMetadata("hasVal.kt")
+        public void testHasVal() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/hasVal.kt");
+        }
+
+        @TestMetadata("hasVar.kt")
+        public void testHasVar() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/hasVar.kt");
+        }
+
+        @TestMetadata("outOfRange.kt")
+        public void testOutOfRange() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/outOfRange.kt");
+        }
+
+        @TestMetadata("secondaryConstructorParameter.kt")
+        public void testSecondaryConstructorParameter() throws Exception {
+            runTest("../../../idea/tests/testData/intentions/addValOrVar/secondaryConstructorParameter.kt");
+        }
+    }
 
 
 

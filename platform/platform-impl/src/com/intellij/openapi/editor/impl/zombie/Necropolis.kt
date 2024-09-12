@@ -4,6 +4,7 @@ package com.intellij.openapi.editor.impl.zombie
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.application.readActionBlocking
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -104,7 +105,10 @@ class Necropolis(private val project: Project, private val coroutineScope: Corou
         override fun editorReleased(event: EditorFactoryEvent) {
           val recipe = createTurningRecipe(event)
           if (recipe != null) {
-            turnIntoZombiesAndBury(necromancers, recipe)
+            //maybe readaction
+            WriteIntentReadAction.run {
+              turnIntoZombiesAndBury(necromancers, recipe)
+            }
           }
         }
       },
@@ -130,12 +134,16 @@ class Necropolis(private val project: Project, private val coroutineScope: Corou
         necromancer to zombie
       }
     }.toList()
+    if (LOG.isDebugEnabled) {
+      LOG.debug("Turned into zombies for ${recipe.fileId}: ${zombies.map { it.first.name() }}")
+    }
     if (zombies.isNotEmpty()) {
       coroutineScope.launch {
         val documentContent = readActionBlocking {
           if (recipe.isValid()) {
             recipe.document.immutableCharSequence
           } else {
+            LOG.debug("Invalid recipe for ${recipe.fileId}}")
             null
           }
         }
@@ -145,6 +153,7 @@ class Necropolis(private val project: Project, private val coroutineScope: Corou
             launch(CoroutineName(necromancer.name())) {
               if (recipe.isValid() && necromancer.shouldBuryZombie(recipe, zombie)) {
                 necromancer.buryZombie(recipe.fileId, FingerprintedZombieImpl(fingerprint, zombie))
+                LOG.debug("Buried ${necromancer.name()} for ${recipe.fileId}")
               }
             }
           }

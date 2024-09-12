@@ -60,6 +60,11 @@ public class K2MoveFileOrDirectoriesTestGenerated extends AbstractK2MoveFileOrDi
         runTest("../../idea/tests/testData/refactoring/moveFile/kotlin/externalDestructuringUsage/externalDestructuringUsage.test");
     }
 
+    @TestMetadata("kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test")
+    public void testKotlin_innerReferenceWithoutQualifier_InnerReferenceWithoutQualifier() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveFile/kotlin/innerReferenceWithoutQualifier/innerReferenceWithoutQualifier.test");
+    }
+
     @TestMetadata("kotlin/internalReferences/internalReferences.test")
     public void testKotlin_internalReferences_InternalReferences() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveFile/kotlin/internalReferences/internalReferences.test");
@@ -68,6 +73,11 @@ public class K2MoveFileOrDirectoriesTestGenerated extends AbstractK2MoveFileOrDi
     @TestMetadata("kotlin/keepImportAliasRefs/keepImportAliasRefs.test")
     public void testKotlin_keepImportAliasRefs_KeepImportAliasRefs() throws Exception {
         runTest("../../idea/tests/testData/refactoring/moveFile/kotlin/keepImportAliasRefs/keepImportAliasRefs.test");
+    }
+
+    @TestMetadata("kotlin/langInjection/langInjection.test")
+    public void testKotlin_langInjection_LangInjection() throws Exception {
+        runTest("../../idea/tests/testData/refactoring/moveFile/kotlin/langInjection/langInjection.test");
     }
 
     @TestMetadata("kotlin/longName/longName.test")

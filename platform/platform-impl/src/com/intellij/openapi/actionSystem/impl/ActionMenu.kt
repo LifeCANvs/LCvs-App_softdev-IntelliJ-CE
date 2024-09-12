@@ -33,7 +33,6 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBMenu
 import com.intellij.ui.icons.getMenuBarIcon
-import com.intellij.ui.mac.foundation.NSDefaults
 import com.intellij.ui.plaf.beg.BegMenuItemUI
 import com.intellij.ui.plaf.beg.IdeaMenuUI
 import com.intellij.util.FontUtil
@@ -63,7 +62,8 @@ class ActionMenu constructor(private val context: DataContext?,
                              private val presentationFactory: PresentationFactory,
                              private var isMnemonicEnabled: Boolean,
                              private val useDarkIcons: Boolean,
-                             val isHeaderMenuItem: Boolean = false) : JBMenu() {
+                             val isHeaderMenuItem: Boolean = false
+) : JBMenu() {
   private val group = createActionRef(group)
   private val presentation = presentationFactory.getPresentation(group)
 
@@ -367,6 +367,15 @@ class ActionMenu constructor(private val context: DataContext?,
       }
     }
 
+    if (!SystemInfo.isMacSystemMenu && parent is JMenuBar) {
+      // Workaround for a problem in `javax.swing.JMenu.getPopupMenuOrigin` method:
+      // 1. Show some menu above the correspondent main menu item
+      // 2. Change its content (see video in IJPL-54336) or move the main frame to lower position
+      // 3. Open the menu again: it will have the wrong position
+      // The position is calculated based on the old size, resetting size forces `getPopupMenuOrigin` method to use preferred size
+      popupMenu.size = Dimension(0, 0)
+    }
+
     super.setPopupMenuVisible(value)
 
     if (value) {
@@ -411,16 +420,12 @@ class ActionMenu constructor(private val context: DataContext?,
 
   fun fillMenu() {
     val context = getDataContext()
-    val isDarkMenu = SystemInfo.isMacSystemMenu && NSDefaults.isDarkMenuBar()
-    Utils.fillMenu(group = group.getAction(),
-                   component = this,
-                   nativePeer = null,
+    Utils.fillMenu(uiKind = ActualActionUiKind.Menu(this, isMainMenuPlace),
+                   group = group.getAction(),
                    enableMnemonics = isMnemonicEnabled,
                    presentationFactory = presentationFactory,
                    context = context,
                    place = place,
-                   isWindowMenu = true,
-                   useDarkIcons = isDarkMenu,
                    progressPoint = RelativePoint.getNorthEastOf(this)) { !isSelected }
   }
 }

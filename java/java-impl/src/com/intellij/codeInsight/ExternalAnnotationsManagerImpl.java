@@ -101,7 +101,7 @@ import java.util.stream.Collectors;
 /**
  * @author anna
  */
-public final class ExternalAnnotationsManagerImpl extends ModCommandAwareExternalAnnotationsManager implements Disposable {
+public class ExternalAnnotationsManagerImpl extends ModCommandAwareExternalAnnotationsManager implements Disposable {
   private static final Logger LOG = Logger.getInstance(ExternalAnnotationsManagerImpl.class);
   private static final NotificationGroup EXTERNAL_ANNOTATIONS_MESSAGES =
     NotificationGroupManager.getInstance().getNotificationGroup("External annotations");
@@ -730,7 +730,7 @@ public final class ExternalAnnotationsManagerImpl extends ModCommandAwareExterna
       if (!entries.isEmpty()) {
         for (OrderEntry entry : entries) {
           if (!(entry instanceof ModuleOrderEntry)) {
-            if (!AnnotationOrderRootType.getUrls(entry).isEmpty()) {
+            if (AnnotationOrderRootType.hasUrls(entry)) {
               return AnnotationPlace.EXTERNAL;
             }
             break;
@@ -899,7 +899,7 @@ public final class ExternalAnnotationsManagerImpl extends ModCommandAwareExterna
     if (hasAnyAnnotationsRoots()) {
       ProjectFileIndex fileIndex = ProjectRootManager.getInstance(myPsiManager.getProject()).getFileIndex();
       for (OrderEntry entry : fileIndex.getOrderEntriesForFile(file)) {
-        if (!(entry instanceof ModuleOrderEntry) && !AnnotationOrderRootType.getUrls(entry).isEmpty()) {
+        if (!(entry instanceof ModuleOrderEntry) && AnnotationOrderRootType.hasUrls(entry)) {
           return true;
         }
       }

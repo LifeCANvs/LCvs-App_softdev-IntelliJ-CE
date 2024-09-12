@@ -99,13 +99,14 @@ context(KaSession)
 @ApiStatus.Internal
 fun generateMember(
     project: Project,
-    ktClassMember: KtClassMember,
+    ktClassMember: KtClassMember?,
     symbol: KaCallableSymbol,
     targetClass: KtClassOrObject?,
     copyDoc: Boolean,
     mode: MemberGenerateMode = MemberGenerateMode.OVERRIDE
 ): KtCallableDeclaration = with(ktClassMember) {
     val bodyType = when {
+        this == null -> BodyType.FromTemplate
         targetClass?.hasExpectModifier() == true -> BodyType.NoBody
         symbol.isExtension && mode == MemberGenerateMode.OVERRIDE -> BodyType.FromTemplate
         else -> bodyType
@@ -194,7 +195,7 @@ fun generateMember(
         }
     }
 
-    if (preferConstructorParameter && ktClassMember.memberInfo.isProperty) {
+    if (this != null && preferConstructorParameter && memberInfo.isProperty) {
         return generateConstructorParameter(project, symbol, renderer)
     }
 
@@ -311,7 +312,7 @@ private fun generateProperty(
 }
 
 @OptIn(KaExperimentalApi::class)
-private fun <T> KaSession.generateUnsupportedOrSuperCall(
+fun <T> KaSession.generateUnsupportedOrSuperCall(
     project: Project, symbol: T, bodyType: BodyType, canBeEmpty: Boolean = true
 ): String where T : KaNamedSymbol, T : KaCallableSymbol {
     when (bodyType.effectiveBodyType(canBeEmpty)) {

@@ -6,6 +6,7 @@ import com.intellij.codeWithMe.ClientId;
 import com.intellij.concurrency.ContextAwareRunnable;
 import com.intellij.diagnostic.Dumpable;
 import com.intellij.ide.*;
+import com.intellij.ide.actions.DistractionFreeModeController;
 import com.intellij.ide.dnd.DnDManager;
 import com.intellij.ide.dnd.DnDManagerImpl;
 import com.intellij.ide.lightEdit.LightEdit;
@@ -126,6 +127,7 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
@@ -295,7 +297,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private EditorDropHandler myDropHandler;
 
-  private Predicate<? super RangeHighlighter> myHighlightingFilter;
+  private final HighlighterFilter myHighlightingFilter = new HighlighterFilter();
 
   private final @NotNull IndentsModel myIndentsModel;
 
@@ -643,37 +645,65 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       myMarkupModel.repaint(start, end);
     }
   }
-
+  private record HighlighterChange(int affectedStart,
+                                   int affectedEnd,
+                                   boolean canImpactGutterSize,
+                                   boolean fontStyleChanged,
+                                   boolean foregroundColorChanged,
+                                   boolean isAccessibleGutterElement,
+                                   boolean needRestart) {}
+  private final AtomicReference<HighlighterChange> myCompositeHighlighterChange = new AtomicReference<>();
   private void onHighlighterChanged(@NotNull RangeHighlighterEx highlighter,
                                     boolean canImpactGutterSize, boolean fontStyleChanged, boolean foregroundColorChanged) {
-    EdtInvocationManager.invokeLaterIfNeeded(() -> {
-      if (isDisposed() || myDocument.isInBulkUpdate() || myInlayModel.isInBatchMode()) return; // will be repainted later
-
-      if (canImpactGutterSize) {
-        updateGutterSize();
-      }
-
-      if (myDocumentChangeInProgress) return;
-
-      int textLength = myDocument.getTextLength();
-      int start = MathUtil.clamp(highlighter.getAffectedAreaStartOffset(), 0, textLength);
-      int end = MathUtil.clamp(highlighter.getAffectedAreaEndOffset(), start, textLength);
-
-      if (myGutterComponent.getCurrentAccessibleLine() != null &&
-          AccessibleGutterLine.isAccessibleGutterElement(highlighter.getGutterIconRenderer())) {
-        escapeGutterAccessibleLine(start, end);
-      }
-      int startLine = myDocument.getLineNumber(start);
-      int endLine = myDocument.getLineNumber(end);
-      if (start != end && (fontStyleChanged || foregroundColorChanged)) {
-        myView.invalidateRange(start, end, fontStyleChanged);
-      }
-      if (!myFoldingModel.isInBatchFoldingOperation()) { // at the end of the batch folding operation everything is repainted
-        repaintLines(Math.max(0, startLine - 1), Math.min(endLine + 1, getDocument().getLineCount()));
-      }
-
-      updateCaretCursor();
+    int textLength = myDocument.getTextLength();
+    int hstart = MathUtil.clamp(highlighter.getAffectedAreaStartOffset(), 0, textLength);
+    int hend = MathUtil.clamp(highlighter.getAffectedAreaEndOffset(), hstart, textLength);
+    boolean isAccessibleGutterElement = AccessibleGutterLine.isAccessibleGutterElement(highlighter.getGutterIconRenderer());
+    HighlighterChange change = new HighlighterChange(hstart, hend, canImpactGutterSize, fontStyleChanged, foregroundColorChanged, isAccessibleGutterElement, false);
+    HighlighterChange oldChange = myCompositeHighlighterChange.getAndAccumulate(change, (change1, change2) -> {
+      if (change1 == null) return change2;
+      if (change2 == null) return change1;
+      int start2 = MathUtil.clamp(Math.min(change1.affectedStart, change2.affectedStart), 0, textLength);
+      int end2 = MathUtil.clamp(Math.max(change1.affectedEnd, change2.affectedEnd), 0, textLength);
+      return new HighlighterChange(start2, end2,
+                                   change1.canImpactGutterSize() || change2.canImpactGutterSize(),
+                                   change1.fontStyleChanged() || change2.fontStyleChanged(),
+                                   change1.foregroundColorChanged() || change2.foregroundColorChanged(),
+                                   change1.isAccessibleGutterElement() || change2.isAccessibleGutterElement(),
+                                   change1.needRestart() || change2.needRestart());
     });
+    if (oldChange == null || oldChange.needRestart()) {
+      EdtInvocationManager.invokeLaterIfNeeded(() -> {
+        if (isDisposed() || myDocument.isInBulkUpdate() || myInlayModel.isInBatchMode() || myDocumentChangeInProgress) {
+          myCompositeHighlighterChange.getAndUpdate(old -> old == null ? null : new HighlighterChange(old.affectedStart(), old.affectedEnd(), old.canImpactGutterSize(), old.fontStyleChanged(), old.foregroundColorChanged(), old.isAccessibleGutterElement(), true));
+          return; // will be repainted later
+        }
+
+        HighlighterChange newChange = myCompositeHighlighterChange.getAndSet(null);
+        if (newChange == null) return;
+
+        if (newChange.canImpactGutterSize()) {
+          updateGutterSize();
+        }
+
+        int docTextLength = myDocument.getTextLength();
+        int start = MathUtil.clamp(newChange.affectedStart(), 0, docTextLength);
+        int end = MathUtil.clamp(newChange.affectedEnd(), start, docTextLength);
+
+        if (myGutterComponent.getCurrentAccessibleLine() != null && newChange.isAccessibleGutterElement()) {
+          escapeGutterAccessibleLine(start, end);
+        }
+        int startLine = myDocument.getLineNumber(start);
+        int endLine = myDocument.getLineNumber(end);
+        if (start != end && (newChange.fontStyleChanged() || newChange.foregroundColorChanged())) {
+          myView.invalidateRange(start, end, newChange.fontStyleChanged());
+        }
+        if (!myFoldingModel.isInBatchFoldingOperation()) { // at the end of the batch folding operation everything is repainted
+          repaintLines(Math.max(0, startLine - 1), Math.min(endLine + 1, getDocument().getLineCount()));
+        }
+        updateCaretCursor();
+      });
+    }
   }
 
   private void onInlayUpdated(@NotNull Inlay<?> inlay, int changeFlags) {
@@ -2219,6 +2249,16 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private boolean composedTextExists() {
     MyInputMethodHandler handler = getMyInputMethodHandler();
     return handler != null && handler.isComposedTextShown();
+  }
+
+  /**
+   * Returns true if the default logic ({@link MyInputMethodHandler}) should handle input method events.
+   * Customize it with: (a) `{@link #setInputMethodRequests(InputMethodRequests)}` and
+   * (b) `editor.contentComponent.addInputMethodListener(inputMethodListener)`.
+   */
+  boolean isDefaultInputMethodHandler() {
+    InputMethodRequestsHolder holder = myInputMethodRequestsHolder;
+    return holder == null || holder.asMyHandler() != null;
   }
 
   private @Nullable MyInputMethodHandler getMyInputMethodHandler() {
@@ -3800,14 +3840,53 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myDropHandler = dropHandler;
   }
 
+  /**
+   * @deprecated Use {@link #addHighlightingPredicate(Key, Predicate)} instead and provide an explicit equality object
+   */
+  @Deprecated
   public void setHighlightingPredicate(@Nullable Predicate<? super RangeHighlighter> filter) {
-    if (myHighlightingFilter == filter) return;
-    Predicate<? super RangeHighlighter> oldFilter = myHighlightingFilter;
-    myHighlightingFilter = filter;
+    var wrapper = filter == null ? null : new PredicateWrapper(filter);
+    addHighlightingPredicate(PredicateWrapper.myKey, wrapper);
+  }
+
+  private static class PredicateWrapper implements EditorHighlightingPredicate {
+    private static final Key<PredicateWrapper> myKey = Key.create("default-highlighting-predicate");
+
+    private final @NotNull Predicate<? super RangeHighlighter> filter;
+
+    private PredicateWrapper(@NotNull Predicate<? super RangeHighlighter> filter) { this.filter = filter; }
+
+    @Override
+    public boolean test(@NotNull RangeHighlighter highlighter) {
+      return filter.test(highlighter);
+    }
+  }
+
+  /**
+   * Adds a highlighting predicate to the editor markup model (or removes the existing one if null is passed).
+   * It is applied to this editor only, other editors are not affected.
+   * <p/>
+   * The editor keeps the last added predicate with a given key. This means several predicates can co-exist at the same time.
+   * A range highlighter is shown only if all predicates accept it.
+   * <p/>
+   *
+   * @param key only the last added predicate with a given key is preserved
+   * @param predicate predicate that checks if the editor should show a range highlighter or not. If null is passed, the previous predicate associated with key gets erased
+   */
+  @ApiStatus.Experimental
+  @RequiresEdt
+  public <T extends EditorHighlightingPredicate> void addHighlightingPredicate(
+    @NotNull Key<T> key,
+    @Nullable T predicate
+  ) {
+    HighlighterFilter oldFilter = myHighlightingFilter.addPredicate(key, predicate);
+    if (oldFilter == null) { // nothing changed
+      return;
+    }
 
     for (RangeHighlighter highlighter : myDocumentMarkupModel.getDelegate().getAllHighlighters()) {
-      boolean oldAvailable = oldFilter == null || oldFilter.test(highlighter);
-      boolean newAvailable = filter == null || filter.test(highlighter);
+      boolean oldAvailable = oldFilter.test(highlighter);
+      boolean newAvailable = myHighlightingFilter.test(highlighter);
       if (oldAvailable != newAvailable) {
         TextAttributes attributes = highlighter.getTextAttributes(getColorsScheme());
         myMarkupModelListener.attributesChanged((RangeHighlighterEx)highlighter, true,
@@ -3819,8 +3898,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   boolean isHighlighterAvailable(@NotNull RangeHighlighter highlighter) {
-    Predicate<? super RangeHighlighter> filter = myHighlightingFilter;
-    return filter == null || filter.test(highlighter);
+    return myHighlightingFilter.test(highlighter);
   }
 
   private boolean hasBlockInlay(@NotNull Point point) {
@@ -5425,7 +5503,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   public boolean isInDistractionFreeMode() {
     return EditorUtil.isRealFileEditor(this)
-           && (Registry.is("editor.distraction.free.mode") || isInPresentationMode());
+           && (DistractionFreeModeController.isDistractionFreeModeEnabled() || isInPresentationMode());
   }
 
   boolean isInPresentationMode() {
@@ -5561,7 +5639,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
     @Override
     public void layout() {
-      ReadAction.run(() -> {
+      WriteIntentReadAction.run((Runnable)() -> {
         if (isInDistractionFreeMode()) {
           // re-calc gutter extra size after editor size is set
           // & layout once again to avoid blinking
@@ -5902,3 +5980,4 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 }
+

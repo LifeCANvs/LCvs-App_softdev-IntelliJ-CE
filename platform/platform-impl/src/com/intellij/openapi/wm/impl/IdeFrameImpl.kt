@@ -2,6 +2,7 @@
 package com.intellij.openapi.wm.impl
 
 import com.intellij.diagnostic.LoadingState
+import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettings.Companion.setupAntialiasing
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.UiDataProvider
@@ -12,6 +13,7 @@ import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.impl.FrameInfoHelper.Companion.isMaximized
 import com.intellij.openapi.wm.impl.ProjectFrameHelper.Companion.getFrameHelper
+import com.intellij.openapi.wm.impl.customFrameDecorations.header.CustomWindowHeaderUtil.hideNativeLinuxTitle
 import com.intellij.platform.ide.diagnostic.startUpPerformanceReporter.FUSProjectHotStartUpMeasurer
 import com.intellij.ui.BalloonLayout
 import com.intellij.ui.DisposableWindow
@@ -21,12 +23,20 @@ import com.intellij.util.ui.EdtInvocationManager
 import com.intellij.util.ui.JBInsets
 import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
-import java.awt.*
+import java.awt.AWTEvent
+import java.awt.Graphics
+import java.awt.Insets
+import java.awt.Rectangle
+import java.awt.Window
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.MouseEvent
+import java.awt.event.WindowEvent
 import javax.accessibility.AccessibleContext
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JFrame.NORMAL
+import javax.swing.JFrame.getFrames
 import javax.swing.JRootPane
 import javax.swing.SwingUtilities
 
@@ -56,8 +66,11 @@ class IdeFrameImpl : JFrame(), IdeFrame, UiDataProvider, DisposableWindow {
   @JvmField
   internal var togglingFullScreenInProgress: Boolean = false
 
+  internal var lastInactiveMouseXAbs: Int = 0
+  internal var lastInactiveMouseYAbs: Int = 0
+  internal var mouseNotPressedYetSinceLastActivation: Boolean = false
   @ApiStatus.Internal
-  var mouseReleaseCountSinceLastActivated = 0
+  var wasJustActivatedByClick: Boolean = false
 
   private var isDisposed = false
 
@@ -120,7 +133,7 @@ class IdeFrameImpl : JFrame(), IdeFrame, UiDataProvider, DisposableWindow {
   @Suppress("OVERRIDE_DEPRECATION")
   override fun show() {
     isDisposed = false
-    if (IdeRootPane.hideNativeLinuxTitle && !isUndecorated) {
+    if (hideNativeLinuxTitle(UISettings.shadowInstance) && !isUndecorated) {
       isUndecorated = true
     }
     @Suppress("DEPRECATION")
@@ -186,6 +199,45 @@ class IdeFrameImpl : JFrame(), IdeFrame, UiDataProvider, DisposableWindow {
     super.setVisible(b)
     if (b) {
       FUSProjectHotStartUpMeasurer.frameBecameVisible()
+    }
+  }
+
+  /**
+   * Detects whether the frame was activated by a mouse click
+   *
+   * When the frame is activated, it's impossible to tell the reason,
+   * as the JRE doesn't report it, and if the frame was activated by a mouse click,
+   * the mouse-pressed event may not even be in the queue yet.
+   *
+   * Therefore, we detect it using heuristics: we record the mouse coordinates
+   * when the frame is inactive and then compare them with the mouse coordinates
+   * when the first mouse-pressed event arrives after frame activation.
+   * If the coordinates are the same, the click is likely to be the cause of the activation.
+   *
+   * This heuristic doesn't work in the case when the user alt-tabs into the frame
+   * and then clicks the mouse without moving it by a single pixel.
+   * But it's a highly unlikely sequence of events and, we're willing to accept false positives in such cases.
+   */
+  internal fun detectWindowActivationByMousePressed(e: AWTEvent) {
+    when (e.id) {
+      MouseEvent.MOUSE_MOVED -> {
+        e as MouseEvent
+        if (!isActive) {
+          lastInactiveMouseXAbs = e.xOnScreen
+          lastInactiveMouseYAbs = e.yOnScreen
+        }
+      }
+      WindowEvent.WINDOW_ACTIVATED -> {
+        mouseNotPressedYetSinceLastActivation = true
+      }
+      MouseEvent.MOUSE_PRESSED -> {
+        e as MouseEvent
+        wasJustActivatedByClick =
+          mouseNotPressedYetSinceLastActivation &&
+          e.xOnScreen == lastInactiveMouseXAbs &&
+          e.yOnScreen == lastInactiveMouseYAbs
+        mouseNotPressedYetSinceLastActivation = false
+      }
     }
   }
 }

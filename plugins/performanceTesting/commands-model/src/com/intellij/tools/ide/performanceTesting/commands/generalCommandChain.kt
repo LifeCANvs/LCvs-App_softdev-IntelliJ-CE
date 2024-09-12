@@ -168,7 +168,13 @@ fun <T : CommandChain> T.navigateAndFindUsages(
   warmup: Boolean = false,
   runInBackground: Boolean = false,
 ): T = apply {
-  val command = mutableListOf("${CMD_PREFIX}findUsages")
+  val command = if (runInBackground) {
+    mutableListOf("${CMD_PREFIX}findUsagesInBackground")
+  }
+  else {
+    mutableListOf("${CMD_PREFIX}findUsages")
+  }
+
   if (expectedElementName.isNotEmpty()) {
     command.add("-expectedName $expectedElementName")
     if (position.isNotEmpty()) {
@@ -178,10 +184,6 @@ fun <T : CommandChain> T.navigateAndFindUsages(
 
   if (scope.isNotEmpty()) {
     command.add("-scope $scope")
-  }
-
-  if (runInBackground) {
-    command.add("-runInBackground")
   }
 
   if (warmup) {
@@ -359,14 +361,6 @@ fun <T : CommandChain> T.doComplete(times: Int): T = apply {
   }
 }
 
-fun <T : CommandChain> T.doHighlightingWarmup(): T = apply {
-  addCommand("${CMD_PREFIX}doHighlight", WARMUP)
-}
-
-fun <T : CommandChain> T.doHighlighting(): T = apply {
-  addCommand("${CMD_PREFIX}doHighlight")
-}
-
 fun <T : CommandChain> T.openProjectView(): T = apply {
   addCommand("${CMD_PREFIX}openProjectView")
 }
@@ -464,12 +458,23 @@ fun <T : CommandChain> T.stopPowerSave(): T = apply {
 }
 
 fun <T : CommandChain> T.searchEverywhere(
+  tab: CommonSearchEverywhereTabs,
+  textToInsert: String = "",
+  textToType: String = "",
+  close: Boolean = false,
+  selectFirst: Boolean = false,
+  warmup: Boolean = false,
+  startThoughAction: Boolean = false,
+): T = searchEverywhere(tab.tabId, textToInsert, textToType, close, selectFirst, warmup, startThoughAction)
+
+fun <T : CommandChain> T.searchEverywhere(
   tab: String = "all",
   textToInsert: String = "",
   textToType: String = "",
   close: Boolean = false,
   selectFirst: Boolean = false,
   warmup: Boolean = false,
+  startThoughAction: Boolean = false,
 ): T = apply {
   val closeOnOpenArgument = when {
     close -> "-close"
@@ -484,10 +489,11 @@ fun <T : CommandChain> T.searchEverywhere(
     else -> ""
   }
   val warmupText = if (warmup) "|WARMUP" else ""
+  val startThroughActionText = if (startThoughAction) "|START_THROUGH_ACTION" else ""
   if (selectFirstArgument.isNotEmpty() && closeOnOpenArgument.isNotEmpty()) {
     throw Exception("selectFirst=true argument will be ignored since close=true and SE will be closed first")
   }
-  addCommand("${CMD_PREFIX}searchEverywhere", "-tab $tab $closeOnOpenArgument $selectFirstArgument $argumentForTyping|$textToInsert$warmupText")
+  addCommand("${CMD_PREFIX}searchEverywhere", "-tab $tab $closeOnOpenArgument $selectFirstArgument $argumentForTyping|$textToInsert$warmupText$startThroughActionText")
 }
 
 fun <T : CommandChain> T.selectFileInProjectView(relativePath: String): T = apply {
@@ -703,6 +709,14 @@ fun <T : CommandChain> T.createSpringProject(newMavenProjectDto: NewSpringProjec
 fun <T : CommandChain> T.updateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
   val options = objectMapper.writeValueAsString(settings)
   addCommand("${CMD_PREFIX}updateMavenGoal $options")
+}
+
+fun <T : CommandChain> T.setupInlineCompletionListener(): T = apply {
+  addCommand("${CMD_PREFIX}setupInlineCompletionListener")
+}
+
+fun <T : CommandChain> T.callInlineCompletionCommand(): T = apply {
+  addCommand("${CMD_PREFIX}callInlineCompletionCommand")
 }
 
 fun <T : CommandChain> T.validateMavenGoal(settings: MavenGoalConfigurationDto): T = apply {
@@ -1083,7 +1097,7 @@ fun <T : CommandChain> T.gitCommitFile(pathToFile: String, commitMessage: String
 }
 
 fun <T : CommandChain> T.gitRollbackFile(pathToFile: String): T = apply {
-  addCommand("${CMD_PREFIX}gitRollback ${pathToFile}")
+  addCommand("${CMD_PREFIX}gitRollbackFile ${pathToFile}")
 }
 
 fun <T : CommandChain> T.replaceText(startOffset: Int? = null, endOffset: Int? = null, newText: String? = null): T = apply {
@@ -1179,10 +1193,10 @@ fun <T : CommandChain> T.expandProjectView(relativePath: String): T = apply {
   addCommand("${CMD_PREFIX}expandProjectView $relativePath")
 }
 
-/**
- *  The first call will create and start span.
- *  The second call with the same spanName will stop span.
- * */
-fun <T : CommandChain> T.handleSpan(spanName: String): T = apply {
+fun <T : CommandChain> T.startNewSpan(spanName: String): T = apply {
+  addCommand("${CMD_PREFIX}handleSpan $spanName")
+}
+
+fun <T : CommandChain> T.stopSpan(spanName: String): T = apply {
   addCommand("${CMD_PREFIX}handleSpan $spanName")
 }

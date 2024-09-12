@@ -1,16 +1,22 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.kotlin.idea.k2.refactoring.introduceParameter
 
+import com.intellij.CommonBundle
+import com.intellij.lang.findUsages.DescriptiveNameUtil
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.refactoring.RefactoringActionHandler
 import com.intellij.refactoring.RefactoringBundle
+import com.intellij.refactoring.changeSignature.ChangeSignatureProcessor
+import com.intellij.refactoring.changeSignature.ParameterInfoImpl
 import com.intellij.refactoring.introduce.inplace.AbstractInplaceIntroducer
+import com.intellij.refactoring.util.CommonRefactoringUtil
 import com.intellij.usageView.UsageInfo
 import com.intellij.util.SmartList
 import com.intellij.util.containers.MultiMap
@@ -22,11 +28,11 @@ import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisFromWriteAct
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisFromWriteAction
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFunctionalTypeRenderer
 import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaImplicitReceiverValue
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFunctionalTypeRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.base.analysis.api.utils.analyzeInModalWindow
@@ -42,17 +48,14 @@ import org.jetbrains.kotlin.idea.codeinsight.utils.NamedArgumentUtils
 import org.jetbrains.kotlin.idea.core.CollectingNameValidator
 import org.jetbrains.kotlin.idea.k2.refactoring.changeSignature.*
 import org.jetbrains.kotlin.idea.k2.refactoring.checkSuperMethods
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractableCodeDescriptor
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractableCodeDescriptorWithConflicts
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractionData
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractionGeneratorConfiguration
-import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.ExtractionResult
+import org.jetbrains.kotlin.idea.k2.refactoring.extractFunction.*
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.K2ExtractableSubstringInfo
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.K2SemanticMatcher
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.ExtractionDataAnalyzer
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.ExtractionEngineHelper
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.k2.refactoring.introduce.extractionEngine.approximateWithResolvableType
+import org.jetbrains.kotlin.idea.refactoring.canRefactorElement
 import org.jetbrains.kotlin.idea.refactoring.introduce.*
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.AnalysisResult
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.ExtractionOptions
@@ -187,7 +190,7 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
             if (message != null) {
                 return@analyzeInModalWindow null
             }
-            require (expressionType!=null)
+            require(expressionType != null)
             suggestedNames = nameSuggester.invoke(this, expressionType)
 
             val parametersUsages = findInternalUsagesOfParametersAndReceiver(targetParent)
@@ -254,7 +257,7 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
                         && !expression.mustBeParenthesizedInInitializerPosition()
 
                 if (isTestMode) {
-                    introduceParameterDescriptor.performRefactoring()
+                    introduceParameterDescriptor.performRefactoring(editor = editor)
                     return
                 }
 
@@ -268,7 +271,7 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
                         editor
                     ) {
                         override fun performRefactoring(descriptor: IntroduceParameterDescriptor<KtNamedDeclaration>) {
-                            descriptor.performRefactoring()
+                            descriptor.performRefactoring(editor = editor)
                         }
 
                         override fun switchToDialogUI() {
@@ -406,9 +409,52 @@ open class KotlinFirIntroduceParameterHandler(private val helper: KotlinIntroduc
     }
 }
 
-fun IntroduceParameterDescriptor<KtNamedDeclaration>.performRefactoring(onExit: (() -> Unit)? = null) {
+@OptIn(KaExperimentalApi::class)
+fun IntroduceParameterDescriptor<KtNamedDeclaration>.performRefactoring(editor: Editor) {
     val superMethods = checkSuperMethods(callable, emptyList(), RefactoringBundle.message("to.refactor"))
-    val targetCallable = superMethods.filterIsInstance<KtNamedDeclaration>().firstOrNull() ?: return
+    val targetCallable = superMethods.firstOrNull() ?: return
+
+    if (!targetCallable.canRefactorElement()) {
+        val unmodifiableFileName = targetCallable.containingFile?.name
+        val message = RefactoringBundle.message("refactoring.cannot.be.performed") + "\n" +
+                KotlinBundle.message(
+                    "error.hint.cannot.modify.0.declaration.from.1.file",
+                    DescriptiveNameUtil.getDescriptiveName(targetCallable),
+                    unmodifiableFileName!!,
+                )
+        CommonRefactoringUtil.showErrorHint(callable.project, editor, message, CommonBundle.getErrorTitle(), INTRODUCE_PARAMETER)
+        return
+    }
+
+    if (targetCallable is PsiMethod) {
+        val typeReference =
+            KtPsiFactory.contextual(callable).createType(newParameterTypeText, callable, callable, Variance.INVARIANT)
+
+        val psiType = analyzeInModalWindow(typeReference, KotlinBundle.message("fix.change.signature.prepare")) {
+            typeReference.type.asPsiType(targetCallable, true)
+        }
+
+        val newParam = ParameterInfoImpl.create(-1).withName(newParameterName).withType(psiType)
+        val newParameters = ParameterInfoImpl.fromMethod(targetCallable) + newParam
+        object : ChangeSignatureProcessor(
+            targetCallable.project,
+            targetCallable,
+            false,
+            null,
+            targetCallable.name,
+            targetCallable.returnType,
+            newParameters
+        ) {
+            override fun performRefactoring(usages: Array<out UsageInfo?>) {
+                super.performRefactoring(usages)
+                occurrencesToReplace.forEach {
+                    occurrenceReplacer(it)
+                }
+            }
+        }.run()
+    }
+
+    if (targetCallable !is KtNamedDeclaration) return
 
     val methodDescriptor = KotlinMethodDescriptor((targetCallable as? KtClass)?.primaryConstructor ?: targetCallable)
     val changeInfo = KotlinChangeInfo(methodDescriptor)
@@ -416,7 +462,7 @@ fun IntroduceParameterDescriptor<KtNamedDeclaration>.performRefactoring(onExit: 
     val defaultValue = (if (newArgumentValue is KtProperty) (newArgumentValue as KtProperty).initializer else newArgumentValue)?.let { KtPsiUtil.safeDeparenthesize(it) }
 
     if (!withDefaultValue) {
-        val parameters = targetCallable.getValueParameters()
+        val parameters = callable.getValueParameters()
         val withReceiver = methodDescriptor.receiver != null
         parametersToRemove
             .map {
@@ -448,7 +494,6 @@ fun IntroduceParameterDescriptor<KtNamedDeclaration>.performRefactoring(onExit: 
             occurrencesToReplace.forEach {
                 occurrenceReplacer(it)
             }
-            onExit?.invoke()
         }
     }.run()
 }

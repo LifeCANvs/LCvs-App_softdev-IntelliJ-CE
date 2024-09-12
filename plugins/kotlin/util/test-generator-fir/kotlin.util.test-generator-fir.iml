@@ -9,8 +9,8 @@
         <compilerArguments>
           <stringArguments>
             <stringArg name="jvmTarget" arg="17" />
-            <stringArg name="apiVersion" arg="1.9" />
-            <stringArg name="languageVersion" arg="1.9" />
+            <stringArg name="apiVersion" arg="2.0" />
+            <stringArg name="languageVersion" arg="2.0" />
           </stringArguments>
         </compilerArguments>
       </configuration>
@@ -76,5 +76,8 @@
     <orderEntry type="module" module-name="kotlin.code-insight.fixes.k2.tests" scope="TEST" />
     <orderEntry type="module" module-name="intellij.gradle.toolingExtension.tests" scope="TEST" />
     <orderEntry type="module" module-name="kotlin.gradle.gradle-java.tests.k2" scope="TEST" />
+    <orderEntry type="module" module-name="kotlin.base.analysis.analysis-api.k2.tests" scope="TEST" />
+    <orderEntry type="module" module-name="kotlin.jvm-debugger.test.compose.k2" scope="TEST" />
+    <orderEntry type="module" module-name="kotlin.injection.k2.tests" scope="TEST" />
   </component>
 </module>

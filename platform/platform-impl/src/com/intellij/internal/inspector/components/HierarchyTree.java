@@ -6,6 +6,9 @@ import com.intellij.ide.impl.DataManagerImpl;
 import com.intellij.internal.inspector.PropertyBean;
 import com.intellij.internal.inspector.UiInspectorAction;
 import com.intellij.internal.inspector.UiInspectorUtil;
+import com.intellij.openapi.actionSystem.DataProvider;
+import com.intellij.openapi.actionSystem.UiDataProvider;
+import com.intellij.internal.inspector.accessibilityAudit.*;
 import com.intellij.openapi.ui.DialogPanel;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.Pair;
@@ -150,6 +153,7 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
     private final Accessible myAccessible;
     private final String myName;
     private final boolean isAccessibleNode;
+    private final AccessibilityAuditManager accessibilityAudit;
 
     String myText;
 
@@ -185,6 +189,12 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
       return node;
     }
 
+    public void runAccessibilityTests(@NotNull AccessibleContext ac) { accessibilityAudit.runAccessibilityTests(ac); }
+
+    public void clearAccessibilityTestsResult() { accessibilityAudit.clearAccessibilityTestsResult(); }
+
+    public AccessibilityTestResult getAccessibilityTestResult() { return accessibilityAudit.getAccessibilityTestResult(); }
+
     private ComponentNode(@Nullable Component component,
                           @Nullable Accessible accessible,
                           @NotNull String name,
@@ -194,6 +204,7 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
       myAccessible = accessible;
       myName = name;
       isAccessibleNode = isAccessibleComponent;
+      accessibilityAudit = new AccessibilityAuditManager();
     }
 
     private static List<TreeNode> prepareAccessibleChildren(@Nullable Accessible a) {
@@ -337,15 +348,39 @@ public abstract class HierarchyTree extends JTree implements TreeSelectionListen
           if (component.isDoubleBuffered()) {
             append(", double-buffered", SimpleTextAttributes.GRAYED_ATTRIBUTES);
           }
-          if (DataManagerImpl.getDataProviderEx(component) != null) {
+          if (component instanceof UiDataProvider) {
+            append(", ", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+            append("ui-data-provider", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+          }
+          else if (component instanceof DataProvider) {
             append(", ", SimpleTextAttributes.GRAYED_ATTRIBUTES);
             append("data-provider", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
           }
+          else if (DataManagerImpl.getDataProviderEx(component) != null) {
+            append(", ", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+            append("with data-provider", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+          }
+
           componentNode.setText(toString());
           setIcon(Icons.findIconFor(component));
         }
         else {
           append(componentNode.myName);
+        }
+
+        AccessibilityTestResult accessibilityResult = componentNode.getAccessibilityTestResult();
+
+        if (accessibilityResult != AccessibilityTestResult.NOT_RUNNING) {
+          SimpleTextAttributes attributes;
+
+          if (AccessibilityTestResult.FAIL.equals(accessibilityResult)) {
+            attributes = new SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.RED);
+          } else {
+            attributes = new SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.GREEN);
+          }
+
+          append(", ", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+          append(accessibilityResult.getResult(), attributes);
         }
       }
       if (isRenderer) {

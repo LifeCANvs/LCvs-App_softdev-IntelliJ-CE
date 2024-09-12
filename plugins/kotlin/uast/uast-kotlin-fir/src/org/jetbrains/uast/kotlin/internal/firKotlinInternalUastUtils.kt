@@ -3,6 +3,7 @@
 package org.jetbrains.uast.kotlin.internal
 
 import com.intellij.psi.*
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTypesUtil
 import org.jetbrains.kotlin.analysis.api.*
 import org.jetbrains.kotlin.analysis.api.annotations.*
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
 import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.asJava.*
 import org.jetbrains.kotlin.asJava.classes.lazyPub
@@ -161,8 +163,18 @@ private fun toPsiMethodForDeserialized(
 ): PsiMethod? {
 
     fun equalSignatures(psiMethod: PsiMethod): Boolean {
-        val methodParameters: Array<PsiParameter> = psiMethod.parameterList.parameters
-        val symbolParameters: List<KaValueParameterSymbol> = functionSymbol.valueParameters
+        var methodParameters: List<PsiParameter> = psiMethod.parameterList.parameters.toList()
+        val isSuspend = (functionSymbol as? KaNamedFunctionSymbol)?.isSuspend == true
+        if (isSuspend) {
+            // Drop the Continuation added by the compiler
+            methodParameters = methodParameters.dropLast(1)
+        }
+        val symbolParameters: List<KaParameterSymbol> =
+            if (functionSymbol.isExtension) {
+                listOfNotNull(functionSymbol.receiverParameter) + functionSymbol.valueParameters
+            } else {
+                functionSymbol.valueParameters
+            }
         if (methodParameters.size != symbolParameters.size) {
             return false
         }
@@ -182,15 +194,26 @@ private fun toPsiMethodForDeserialized(
             if (methodParameters[i].type != symbolParameterType) return false
         }
         val psiMethodReturnType = psiMethod.returnType ?: PsiTypes.voidType()
-        val symbolReturnType = toPsiType(
-            functionSymbol.returnType,
-            psiMethod,
-            context,
-            PsiTypeConversionConfiguration(
-                TypeOwnerKind.DECLARATION,
-                typeMappingMode = KaTypeMappingMode.RETURN_TYPE,
-            )
-        )
+        val symbolReturnType =
+            // The return type of compiled `suspend` function is [Object].
+            if (isSuspend) {
+                val psiFacade = JavaPsiFacade.getInstance(psiMethod.project)
+                val psiObjectClass =
+                    psiFacade.findClass(CommonClassNames.JAVA_LANG_OBJECT, GlobalSearchScope.allScope(psiFacade.project))
+                if (psiObjectClass != null) {
+                    PsiTypesUtil.getClassType(psiObjectClass)
+                } else PsiTypes.voidType()
+            } else {
+                toPsiType(
+                    functionSymbol.returnType,
+                    psiMethod,
+                    context,
+                    PsiTypeConversionConfiguration(
+                        TypeOwnerKind.DECLARATION,
+                        typeMappingMode = KaTypeMappingMode.RETURN_TYPE,
+                    )
+                )
+            }
 
         return psiMethodReturnType == symbolReturnType
     }
@@ -266,8 +289,14 @@ private fun toPsiMethodForDeserialized(
     } else null
 }
 
-private fun KaCallInfo?.typeArgumentsMappingOrEmptyMap(): Map<KaTypeParameterSymbol, KaType> =
-    (this?.successfulCallOrNull<KaCall>() as? KaCallableMemberCall<*, *>)?.typeArgumentsMapping ?: emptyMap()
+@OptIn(KaExperimentalApi::class)
+private fun KaCallInfo?.typeArgumentsMappingOrEmptyMap(): Map<KaSymbolPointer<KaTypeParameterSymbol>, KaTypePointer<KaType>> =
+    (this?.successfulCallOrNull<KaCall>() as? KaCallableMemberCall<*, *>)
+        ?.typeArgumentsMapping
+        ?.map { (typeParamSymbol, type) ->
+            typeParamSymbol.createPointer() to type.createPointer()
+        }?.toMap()
+        ?: emptyMap()
 
 /**
  * Returns a `JvmName` annotation value.
@@ -409,7 +438,7 @@ internal tailrec fun psiForUast(symbol: KaSymbol): PsiElement? {
     if (symbol is KaCallableSymbol) {
         if (symbol.origin == KaSymbolOrigin.INTERSECTION_OVERRIDE || symbol.origin == KaSymbolOrigin.SUBSTITUTION_OVERRIDE) {
             val originalSymbol = symbol.fakeOverrideOriginal
-            if (originalSymbol !== symbol) {
+            if (originalSymbol != symbol) {
                 return psiForUast(originalSymbol)
             }
         }

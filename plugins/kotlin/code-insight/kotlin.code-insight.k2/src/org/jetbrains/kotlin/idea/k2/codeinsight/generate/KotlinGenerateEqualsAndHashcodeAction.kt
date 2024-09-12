@@ -46,6 +46,8 @@ class KotlinGenerateEqualsAndHashcodeAction : KotlinGenerateMemberActionBase<Inf
         const val SUPER_HAS_EQUALS = "superHasEquals"
         const val SUPER_HAS_HASHCODE = "superHasHashCode"
 
+        const val SUPER_PARAM_NAME = "superParamName"
+
         const val CHECK_PARAMETER_WITH_INSTANCEOF = "checkParameterWithInstanceof"
     }
 
@@ -60,20 +62,21 @@ class KotlinGenerateEqualsAndHashcodeAction : KotlinGenerateMemberActionBase<Inf
 
     override fun prepareMembersInfo(klass: KtClassOrObject, project: Project, editor: Editor): Info? {
         if (klass !is KtClass) return null
-        val (preInfo, toMemberInfo) = analyzeInModalWindow(klass, KotlinBundle.message("fix.change.signature.prepare")) {
+        val (preInfo, equalsMembers, hashMembers) = analyzeInModalWindow(klass, KotlinBundle.message("fix.change.signature.prepare")) {
             val classSymbol = klass.symbol as? KaClassSymbol ?: return@analyzeInModalWindow null
             val properties = getPropertiesToUseInGeneratedMember(klass)
 
             val equalsMethodForClass = findEqualsMethodForClass(classSymbol)
             val hashCodeMethodForClass = findHashCodeMethodForClass(classSymbol)
 
-            Info(
+            Triple(
+                Info(
                 klass,
                 properties,
                 properties,
                 (equalsMethodForClass?.psi as? KtNamedFunction)?.takeIf { equalsMethodForClass.containingSymbol == classSymbol },
                 (hashCodeMethodForClass?.psi as? KtNamedFunction)?.takeIf { hashCodeMethodForClass.containingSymbol == classSymbol }
-            ) to LinkedHashMap(properties.keysToMap<KtNamedDeclaration, KotlinMemberInfo> { createMemberInfo(it) })
+            ), properties.map { createMemberInfo(it) }, LinkedHashMap(properties.keysToMap<KtNamedDeclaration, KotlinMemberInfo> { createMemberInfo(it) }))
         } ?: return null
 
         var equalsInClass = preInfo.equalsInClass
@@ -100,7 +103,7 @@ class KotlinGenerateEqualsAndHashcodeAction : KotlinGenerateMemberActionBase<Inf
             }
         }
 
-        return with( KotlinGenerateEqualsAndHashCodeWizard(project, klass, preInfo.variablesForEquals, equalsInClass == null, hashCodeInClass == null, toMemberInfo.values.toList(), toMemberInfo)) {
+        return with( KotlinGenerateEqualsAndHashCodeWizard(project, klass, preInfo.variablesForEquals, equalsInClass == null, hashCodeInClass == null, equalsMembers, hashMembers)) {
             if (!klass.hasExpectModifier() && !showAndGet()) return null
 
             Info(

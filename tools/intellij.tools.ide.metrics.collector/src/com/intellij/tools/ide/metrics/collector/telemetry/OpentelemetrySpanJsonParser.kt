@@ -5,7 +5,7 @@ package com.intellij.tools.ide.metrics.collector.telemetry
 import com.intellij.tools.ide.util.common.PrintFailuresMode
 import com.intellij.tools.ide.util.common.withRetryBlocking
 import it.unimi.dsi.fastutil.objects.Object2ObjectFunction
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -20,9 +20,7 @@ import kotlinx.serialization.modules.contextual
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
@@ -82,7 +80,7 @@ private data class OpentelemetryJsonData(
 
 open class OpentelemetrySpanJsonParser(private val spanFilter: SpanFilter) {
   fun getSpanElements(file: Path, spanElementFilter: (SpanElement) -> Boolean = { true }): Set<SpanElement> {
-    var jsonData = getSpans(file, jsonSerializerNanoseconds)
+    val jsonData = getSpans(file, jsonSerializerNanoseconds)
 
     val spans = jsonData.data.single().spans
     val index = getParentToSpanMap(spans)
@@ -92,16 +90,18 @@ open class OpentelemetrySpanJsonParser(private val spanFilter: SpanFilter) {
       result.add(span)
       processChild(result, span, index)
     }
+    OpenTelemetryDeserializerCache.clearCaches()
     return result
   }
 
-  protected open fun processChild(result: MutableSet<SpanElement>, parent: SpanElement, index: Map<String, Collection<SpanElement>>) {
+  protected open fun processChild(result: MutableSet<SpanElement>, parent: SpanElement, index: Map<String, Collection<SpanData>>) {
     index.get(parent.spanId)?.forEach {
+      val span = toSpanElement(it)
       if (parent.isWarmup) {
-        it.isWarmup = true
+        span.isWarmup = true
       }
-      result.add(it)
-      processChild(result = result, parent = it, index = index)
+      result.add(span)
+      processChild(result = result, parent = span, index = index)
     }
   }
 
@@ -133,12 +133,12 @@ open class OpentelemetrySpanJsonParser(private val spanFilter: SpanFilter) {
     return jsonData
   }
 
-  private fun getParentToSpanMap(spans: List<SpanData>): Object2ObjectLinkedOpenHashMap<String, MutableSet<SpanElement>> {
-    val indexParentToChild = Object2ObjectLinkedOpenHashMap<String, MutableSet<SpanElement>>()
+  private fun getParentToSpanMap(spans: List<SpanData>): Object2ObjectOpenHashMap<String, ArrayList<SpanData>> {
+    val indexParentToChild = Object2ObjectOpenHashMap<String, ArrayList<SpanData>>()
     for (span in spans) {
       val parentSpanId = span.getParentSpanId()
       if (parentSpanId != null) {
-        indexParentToChild.computeIfAbsent(parentSpanId, Object2ObjectFunction { ObjectLinkedOpenHashSet() }).add(toSpanElement(span))
+        indexParentToChild.computeIfAbsent(parentSpanId, Object2ObjectFunction { ArrayList(5) }).add(span)
       }
     }
     return indexParentToChild

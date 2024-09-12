@@ -835,6 +835,25 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
     return myFoldingModel;
   }
 
+  @RequiresEdt
+  public void scrollToLine(@NotNull Side side, int line) {
+    int onesideLine = transferLineToOneside(side, line);
+    DiffUtil.scrollEditor(myEditor, onesideLine, 0, false);
+  }
+
+  @RequiresEdt
+  public boolean scrollToChange(@NotNull ScrollToPolicy scrollToChangePolicy) {
+    List<UnifiedDiffChange> changes = myModel.getDiffChanges();
+    if (changes == null) return false;
+
+    UnifiedDiffChange targetChange = scrollToChangePolicy.select(ContainerUtil.filter(changes, it -> !it.isSkipped()));
+    if (targetChange == null) targetChange = scrollToChangePolicy.select(changes);
+    if (targetChange == null) return false;
+
+    DiffUtil.scrollEditor(myEditor, targetChange.getLine1(), false);
+    return true;
+  }
+
   //
   // Getters
   //
@@ -1191,39 +1210,22 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
       return new LogicalPosition(line, column);
     }
 
-    private void doScrollToLine(@NotNull Side side, @NotNull LogicalPosition position) {
-      int onesideLine = transferLineToOneside(side, position.line);
-      DiffUtil.scrollEditor(myEditor, onesideLine, position.column, false);
-    }
-
     @Override
     protected boolean doScrollToLine(boolean onSlowRediff) {
       if (myScrollToLine == null) return false;
-      doScrollToLine(myScrollToLine.first, new LogicalPosition(myScrollToLine.second, 0));
-      return true;
-    }
-
-    private boolean doScrollToChange(@NotNull ScrollToPolicy scrollToChangePolicy) {
-      List<UnifiedDiffChange> changes = myModel.getDiffChanges();
-      if (changes == null) return false;
-
-      UnifiedDiffChange targetChange = scrollToChangePolicy.select(ContainerUtil.filter(changes, it -> !it.isSkipped()));
-      if (targetChange == null) targetChange = scrollToChangePolicy.select(changes);
-      if (targetChange == null) return false;
-
-      DiffUtil.scrollEditor(myEditor, targetChange.getLine1(), false);
+      scrollToLine(myScrollToLine.first, myScrollToLine.second);
       return true;
     }
 
     @Override
     protected boolean doScrollToChange() {
       if (myScrollToChange == null) return false;
-      return doScrollToChange(myScrollToChange);
+      return scrollToChange(myScrollToChange);
     }
 
     @Override
     protected boolean doScrollToFirstChange() {
-      return doScrollToChange(ScrollToPolicy.FIRST_CHANGE);
+      return scrollToChange(ScrollToPolicy.FIRST_CHANGE);
     }
 
     @Override
@@ -1243,7 +1245,7 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
       }
       if (line == -1) return false;
 
-      doScrollToLine(Side.RIGHT, new LogicalPosition(line, 0));
+      scrollToLine(Side.RIGHT, line);
       return true;
     }
   }
@@ -1650,10 +1652,13 @@ public class UnifiedDiffViewer extends ListenerDiffViewerBase implements EditorD
       Document sideDocument = UnifiedDiffViewer.this.getDocument(mySide);
       LineNumberConvertor lineConvertor = blockData.getLineNumberConvertor(mySide);
       int sideLine1 = lineConvertor.convertApproximate(Math.max(0, line1 - 1));
-      int sideLine2 = lineConvertor.convertApproximate(Math.min(DiffUtil.getLineCount(sideDocument), line2 + 1));
+      int sideLine2 = lineConvertor.convertApproximate(Math.min(DiffUtil.getLineCount(oneSideDocument), line2 + 1));
 
+      if (sideLine1 < 0 || sideLine1 > sideLine2 || sideLine2 > DiffUtil.getLineCount(sideDocument)) {
+        return ProperTextRange.create(0, 0);
+      }
       TextRange sideRange = DiffUtil.getLinesRange(sideDocument, sideLine1, sideLine2, false);
-      return new ProperTextRange(sideRange.getStartOffset(), sideRange.getEndOffset());
+      return ProperTextRange.create(sideRange.getStartOffset(), sideRange.getEndOffset());
     }
 
     @Override

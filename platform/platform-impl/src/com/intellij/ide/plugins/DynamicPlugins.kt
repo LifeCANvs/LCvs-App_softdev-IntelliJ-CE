@@ -96,8 +96,8 @@ private val LOG = logger<DynamicPlugins>()
 private val classloadersFromUnloadedPlugins = mutableMapOf<PluginId, WeakList<PluginClassLoader>>()
 
 object DynamicPlugins {
-  private var myProcessRun = false
-  private var myProcessCallback: Runnable? = null
+  private var myProcessRun = 0
+  private val myProcessCallbacks = mutableListOf<Runnable>()
   private val myLock = Any()
 
   @JvmStatic
@@ -142,27 +142,25 @@ object DynamicPlugins {
   private fun runProcess(process: () -> Boolean): Boolean {
     try {
       synchronized(myLock) {
-        assert(!myProcessRun)
-        assert(myProcessCallback == null)
-        myProcessRun = true
+        myProcessRun++
       }
       return process.invoke()
     }
     finally {
+      val callbacks = mutableListOf<Runnable>()
       synchronized(myLock) {
-        myProcessRun = false
-        val callback = myProcessCallback
-        myProcessCallback = null
-        callback
-      }?.run()
+        myProcessRun--
+        callbacks.addAll(myProcessCallbacks)
+        myProcessCallbacks.clear()
+      }
+      callbacks.forEach { it.run() }
     }
   }
 
   fun runAfter(runAlways: Boolean, callback: Runnable) {
     synchronized(myLock) {
-      if (myProcessRun) {
-        assert(myProcessCallback == null)
-        myProcessCallback = callback
+      if (myProcessRun > 0) {
+        myProcessCallbacks.add(callback)
         return
       }
     }
@@ -755,9 +753,6 @@ object DynamicPlugins {
     val app = ApplicationManager.getApplication() as ApplicationImpl
     (ActionManager.getInstance() as ActionManagerImpl).unloadActions(module)
 
-    if (module.pluginId.idString == "com.intellij.jsp") {
-      println("Unloading")
-    }
     val openedProjects = ProjectUtil.getOpenProjects().asList()
     val appExtensionArea = app.extensionArea
     val priorityUnloadListeners = mutableListOf<Runnable>()

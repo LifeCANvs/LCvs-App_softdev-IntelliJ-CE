@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.jps.cmdline;
 
+import com.dynatrace.hash4j.hashing.Hashing;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.gson.Gson;
 import com.google.protobuf.Message;
@@ -15,11 +16,11 @@ import com.intellij.tracing.Tracer;
 import com.intellij.uiDesigner.compiler.AlienFormFileException;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.util.SystemProperties;
-import com.intellij.util.lang.Xxh3;
 import com.jgoodies.forms.layout.CellConstraints;
 import com.thoughtworks.qdox.JavaProjectBuilder;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
+import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
 import io.netty.resolver.AddressResolverGroup;
 import io.netty.util.NetUtil;
@@ -40,8 +41,7 @@ import org.jetbrains.jps.model.serialization.JpsProjectLoader;
 import org.jetbrains.org.objectweb.asm.ClassVisitor;
 import org.jetbrains.org.objectweb.asm.ClassWriter;
 
-import javax.tools.JavaCompiler;
-import javax.tools.ToolProvider;
+import javax.tools.*;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -59,7 +59,8 @@ public final class ClasspathBootstrap {
     EventLoopGroup.class, // netty transport
     AddressResolverGroup.class, // netty resolver
     ByteBufAllocator.class, // netty buffer
-    ProtobufDecoder.class,  // netty codec
+    ByteToMessageDecoder.class, // netty codec http
+    ProtobufDecoder.class,  // netty codec protobuf
     Message.class, // protobuf
   };
 
@@ -129,9 +130,10 @@ public final class ClasspathBootstrap {
     addToClassPath(IXMLBuilder.class, cp);  // nano-xml
     addToClassPath(JavaProjectBuilder.class, cp);  // QDox lightweight java parser
     addToClassPath(Gson.class, cp);  // gson
-    addToClassPath(Xxh3.class, cp);
     // caffeine
     addToClassPath(Caffeine.class, cp);
+    // Hashing
+    addToClassPath(Hashing.class, cp);
 
     addToClassPath(cp, ArtifactRepositoryManager.getClassesFromDependencies());
     addToClassPath(Tracer.class, cp); // tracing infrastructure

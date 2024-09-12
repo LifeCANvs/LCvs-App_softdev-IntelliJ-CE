@@ -4,7 +4,6 @@ package com.intellij.java.compiler.charts.jps;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import com.sun.management.OperatingSystemMXBean;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -14,11 +13,11 @@ import org.jetbrains.jps.builders.DirtyFilesHolder;
 import org.jetbrains.jps.builders.java.JavaSourceRootDescriptor;
 import org.jetbrains.jps.incremental.*;
 import org.jetbrains.jps.incremental.messages.BuildMessage;
+import org.jetbrains.jps.service.SharedThreadPool;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.util.List;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class ChartsBuilderService extends BuilderService {
@@ -33,8 +32,7 @@ public class ChartsBuilderService extends BuilderService {
   private static class ChartsModuleLevelBuilder extends ModuleLevelBuilder {
     private static final Logger LOG = Logger.getInstance(ChartsModuleLevelBuilder.class);
 
-    private ScheduledFuture<?> myStatisticsReporter = null;
-    private Runnable myStatisticsRunnable = null;
+    @Nullable private CompileStatisticService myStatisticService = null;
 
     protected ChartsModuleLevelBuilder() {
       super(BuilderCategory.TRANSLATOR);
@@ -66,44 +64,56 @@ public class ChartsBuilderService extends BuilderService {
 
     @Override
     public void buildStarted(@NotNull CompileContext context) {
-      final MemoryMXBean memory = ManagementFactory.getMemoryMXBean();
-      final OperatingSystemMXBean os = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
-
       context.processMessage(new CompilationStatusBuilderMessage("START"));
-
-      myStatisticsRunnable = () -> send(context, CompileStatisticBuilderMessage.create(memory, os));
-      myStatisticsReporter = AppExecutorUtil.createBoundedScheduledExecutorService("IncProjectBuilder metrics reporter", 1)
-        .scheduleWithFixedDelay(myStatisticsRunnable, 0, 1, TimeUnit.SECONDS);
-    }
-
-    private void send(@NotNull CompileContext context, @Nullable BuildMessage msg) {
-      if (msg != null) context.processMessage(msg);
+      myStatisticService = new CompileStatisticService(context);
+      SharedThreadPool.getInstance().execute(myStatisticService);
     }
 
     @Override
     public void buildFinished(@NotNull CompileContext context) {
       context.processMessage(new CompilationStatusBuilderMessage("FINISH"));
-
-      if (myStatisticsRunnable != null) {
-        myStatisticsRunnable.run();
-        myStatisticsRunnable = null;
-      }
-      if (myStatisticsReporter != null) {
-        myStatisticsReporter.cancel(true);
-        myStatisticsReporter = null;
-      }
     }
 
     @Override
     public void chunkBuildStarted(@NotNull CompileContext context, @NotNull ModuleChunk chunk) {
       context.processMessage(CompileStatisticBuilderMessage.create(chunk.getTargets(), "STARTED"));
-      if (myStatisticsRunnable != null) myStatisticsRunnable.run();
+      if (myStatisticService != null) myStatisticService.send();
     }
 
     @Override
     public void chunkBuildFinished(@NotNull CompileContext context, @NotNull ModuleChunk chunk) {
       context.processMessage(CompileStatisticBuilderMessage.create(chunk.getTargets(), "FINISHED"));
-      if (myStatisticsRunnable != null) myStatisticsRunnable.run();
+      if (myStatisticService != null) myStatisticService.send();
+    }
+  }
+
+  private static class CompileStatisticService implements Runnable {
+    private final MemoryMXBean memory;
+    private final OperatingSystemMXBean os;
+    private final CompileContext context;
+
+    private CompileStatisticService(CompileContext context) {
+      memory = ManagementFactory.getMemoryMXBean();
+      os = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+      this.context = context;
+    }
+
+    public void send() {
+      BuildMessage message = CompileStatisticBuilderMessage.create(memory, os);
+      if (message != null) context.processMessage(message);
+    }
+
+    @Override
+    public void run() {
+      while (true) {
+        try {
+          send();
+          TimeUnit.SECONDS.sleep(1);
+        }
+        catch (Exception e) {
+          break;
+        }
+      }
     }
   }
 }

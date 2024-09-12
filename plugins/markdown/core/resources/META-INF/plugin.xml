@@ -17,6 +17,7 @@
     <module name="intellij.markdown.xml"/>
     <module name="intellij.markdown.model"/>
     <module name="intellij.markdown.spellchecker"/>
+    <module name="intellij.markdown.compose.preview"/>
   </content>
 
   <description><![CDATA[
@@ -201,6 +202,12 @@
     <applicationService serviceImplementation="org.intellij.plugins.markdown.settings.MarkdownCodeFoldingSettings" />
     <applicationService serviceImplementation="org.intellij.plugins.markdown.settings.MarkdownCodeInsightSettings" />
     <applicationService serviceImplementation="org.intellij.plugins.markdown.settings.MarkdownExtensionsSettings" />
+
+    <applicationSettings service="org.intellij.plugins.markdown.settings.MarkdownCodeInsightSettings"/>
+    <applicationSettings service="org.intellij.plugins.markdown.settings.MarkdownPreviewSettings"/>
+    <applicationSettings service="org.intellij.plugins.markdown.settings.MarkdownExtensionsSettings"/>
+
+    <projectSettings service="org.intellij.plugins.markdown.settings.MarkdownSettings"/>
 
     <lang.psiStructureViewFactory language="Markdown"
                                   implementationClass="org.intellij.plugins.markdown.structureView.MarkdownStructureViewFactory"/>

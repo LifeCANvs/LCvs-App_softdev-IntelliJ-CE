@@ -650,6 +650,11 @@ public abstract class HighLevelQuickFixMultiModuleTestGenerated extends Abstract
             runTest("../../../idea/tests/testData/multiModuleQuickFix/createActual/function/");
         }
 
+        @TestMetadata("functionK2")
+        public void testFunctionK2() throws Exception {
+            runTest("../../../idea/tests/testData/multiModuleQuickFix/createActual/functionK2/");
+        }
+
         @TestMetadata("functionSameFile")
         public void testFunctionSameFile() throws Exception {
             runTest("../../../idea/tests/testData/multiModuleQuickFix/createActual/functionSameFile/");
@@ -698,6 +703,11 @@ public abstract class HighLevelQuickFixMultiModuleTestGenerated extends Abstract
         @TestMetadata("property")
         public void testProperty() throws Exception {
             runTest("../../../idea/tests/testData/multiModuleQuickFix/createActual/property/");
+        }
+
+        @TestMetadata("propertyK2")
+        public void testPropertyK2() throws Exception {
+            runTest("../../../idea/tests/testData/multiModuleQuickFix/createActual/propertyK2/");
         }
 
         @TestMetadata("sealed")
@@ -1417,26 +1427,6 @@ public abstract class HighLevelQuickFixMultiModuleTestGenerated extends Abstract
             runTest("../../../idea/tests/testData/multiModuleQuickFix/other/createVarInExpectClass/");
         }
 
-        @TestMetadata("deprecatedHeader")
-        public void testDeprecatedHeader() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/deprecatedHeader/");
-        }
-
-        @TestMetadata("deprecatedHeaderImpl")
-        public void testDeprecatedHeaderImpl() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/deprecatedHeaderImpl/");
-        }
-
-        @TestMetadata("deprecatedImpl")
-        public void testDeprecatedImpl() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/deprecatedImpl/");
-        }
-
-        @TestMetadata("deprecatedImplHeader")
-        public void testDeprecatedImplHeader() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/deprecatedImplHeader/");
-        }
-
         @TestMetadata("functionTypeParameterToReceiverByHeader")
         public void testFunctionTypeParameterToReceiverByHeader() throws Exception {
             runTest("../../../idea/tests/testData/multiModuleQuickFix/other/functionTypeParameterToReceiverByHeader/");
@@ -1610,16 +1600,6 @@ public abstract class HighLevelQuickFixMultiModuleTestGenerated extends Abstract
         @TestMetadata("notMakeAbstractFromActual")
         public void testNotMakeAbstractFromActual() throws Exception {
             runTest("../../../idea/tests/testData/multiModuleQuickFix/other/notMakeAbstractFromActual/");
-        }
-
-        @TestMetadata("orderHeader")
-        public void testOrderHeader() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/orderHeader/");
-        }
-
-        @TestMetadata("orderImpl")
-        public void testOrderImpl() throws Exception {
-            runTest("../../../idea/tests/testData/multiModuleQuickFix/other/orderImpl/");
         }
 
         @TestMetadata("safeDeleteForbiddenFromActual")

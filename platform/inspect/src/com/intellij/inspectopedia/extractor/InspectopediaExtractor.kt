@@ -12,9 +12,7 @@ import com.intellij.codeInspection.options.*
 import com.intellij.ide.plugins.PluginManagerCore.getPluginSet
 import com.intellij.inspectopedia.extractor.data.Inspection
 import com.intellij.inspectopedia.extractor.data.OptionsPanelInfo
-import com.intellij.inspectopedia.extractor.utils.HtmlUtils
 import com.intellij.openapi.application.ApplicationInfo
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModernApplicationStarter
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.components.serviceAsync
@@ -79,7 +77,7 @@ private class InspectopediaExtractor : ModernApplicationStarter() {
         val wrapper = scopeToolState.tool
         val extension = wrapper.extension
         val pluginId = extension?.pluginDescriptor?.pluginId?.idString ?: ideName
-        val description = wrapper.loadDescription()?.splitToSequence("<!-- tooltip end -->")?.map { it.trim() }?.filter { it.isEmpty() }?.toList()
+        val description = wrapper.loadDescription()?.split("<!-- tooltip end -->")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toList()
                           ?: emptyList()
 
         var panelInfo: List<OptionsPanelInfo>? = null
@@ -98,7 +96,7 @@ private class InspectopediaExtractor : ModernApplicationStarter() {
         try {
           val language = wrapper.language
           availablePlugins.get(pluginId)!!.inspections.add(Inspection(
-            id = wrapper.shortName,
+            id = wrapper.tool.alternativeID ?: wrapper.id,
             name = wrapper.displayName,
             severity = wrapper.defaultLevel.name,
             language = language,
@@ -191,14 +189,14 @@ private fun retrievePanelStructure(component: OptComponent, controller: OptionCo
 }
 
 @Suppress("unused")
-data class Plugins(
+private data class Plugins(
   @JvmField val plugins: List<Plugin>,
   @JvmField val ideCode: String,
   @JvmField val ideName: String,
   @JvmField val ideVersion: String,
 )
 
-data class Plugin(
+private data class Plugin(
   @JvmField val id: String,
   @JvmField val name: String,
   @JvmField val version: String?,

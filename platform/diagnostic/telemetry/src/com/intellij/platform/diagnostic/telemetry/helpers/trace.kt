@@ -9,7 +9,7 @@ import io.opentelemetry.api.trace.SpanBuilder
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.context.Context
 import io.opentelemetry.extension.kotlin.asContextElement
-import io.opentelemetry.semconv.SemanticAttributes
+import io.opentelemetry.semconv.ExceptionAttributes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.ApiStatus.Internal
@@ -48,31 +48,23 @@ inline fun <T> Span.use(operation: (Span) -> T): T {
 }
 
 @Internal
-suspend inline fun <T> SpanBuilder.useWithScope(context: CoroutineContext = EmptyCoroutineContext,
-                                                crossinline operation: suspend CoroutineScope.(Span) -> T): T {
-  val span = startSpan()
-  return withContext(Context.current().with(span).asContextElement() + context) {
-    try {
+suspend inline fun <T> SpanBuilder.useWithScope(
+  context: CoroutineContext = EmptyCoroutineContext,
+  crossinline operation: suspend CoroutineScope.(Span) -> T,
+): T {
+  return startSpan().useWithoutActiveScope { span ->
+    // inner withContext to ensure that we report the end of the span only when all child tasks are completed
+    withContext(Context.current().with(span).asContextElement() + context) {
       operation(span)
-    }
-    catch (e: CancellationException) {
-      span.recordException(e, Attributes.of(SemanticAttributes.EXCEPTION_ESCAPED, true))
-      throw e
-    }
-    catch (e: Throwable) {
-      span.recordException(e, Attributes.of(SemanticAttributes.EXCEPTION_ESCAPED, true))
-      span.setStatus(StatusCode.ERROR)
-      throw e
-    }
-    finally {
-      span.end()
     }
   }
 }
 
 @Internal
-internal fun <T> computeWithSpanIgnoreThrows(spanBuilder: SpanBuilder,
-                                             operation: ThrowableNotNullFunction<Span, T, out Throwable>): T {
+internal fun <T> computeWithSpanIgnoreThrows(
+  spanBuilder: SpanBuilder,
+  operation: ThrowableNotNullFunction<Span, T, out Throwable>,
+): T {
   return spanBuilder.use(operation::`fun`)
 }
 
@@ -82,21 +74,26 @@ internal fun runWithSpanIgnoreThrows(spanBuilder: SpanBuilder, operation: Throwa
 }
 
 /**
- * Does not activate the span scope, so **new spans created inside will not be linked to [this] span**.
+ * Do not use it.
+ * Only for implementation.
+ *
+ * Does not activate the span scope, so **new spans created inside [operation] will not be linked to [this] span**.
+ * [Span] supplied as an argument to [operation] may not be the [Span.current].
+ * No overhead of [Context.makeCurrent] is incurred.
+ *
  * Consider using [use] to also activate the scope.
  */
-@PublishedApi
 @Internal
-internal inline fun <T> Span.useWithoutActiveScope(operation: (Span) -> T): T {
+inline fun <T> Span.useWithoutActiveScope(operation: (Span) -> T): T {
   try {
     return operation(this)
   }
   catch (e: CancellationException) {
-    recordException(e, Attributes.of(SemanticAttributes.EXCEPTION_ESCAPED, true))
+    recordException(e, Attributes.of(ExceptionAttributes.EXCEPTION_ESCAPED, true))
     throw e
   }
   catch (e: Throwable) {
-    recordException(e, Attributes.of(SemanticAttributes.EXCEPTION_ESCAPED, true))
+    recordException(e, Attributes.of(ExceptionAttributes.EXCEPTION_ESCAPED, true))
     setStatus(StatusCode.ERROR)
     throw e
   }

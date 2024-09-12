@@ -196,16 +196,6 @@ internal class RemoveExplicitTypeIntention :
       elementContext: Unit,
       updater: ModPsiUpdater,
     ) {
-        element.removeTypeReference()
-    }
-
-    private fun KtDeclaration.removeTypeReference() {
-        if (this is KtCallableDeclaration) {
-            typeReference = null
-        } else if (this is KtPropertyAccessor) {
-            val first = rightParenthesis?.nextSibling ?: return
-            val last = returnTypeReference ?: return
-            deleteChildRange(first, last)
-        }
+        element.removeDeclarationTypeReference()
     }
 }

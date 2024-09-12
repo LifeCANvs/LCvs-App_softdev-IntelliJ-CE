@@ -413,7 +413,7 @@ public class UsageInfo2UsageAdapter implements UsageInModule, UsageInfoAdapter,
       for (AdditionalLibraryRootsProvider e : AdditionalLibraryRootsProvider.EP_NAME.getExtensionList()) {
         for (SyntheticLibrary library : e.getAdditionalProjectLibraries(project)) {
           if (library.getSourceRoots().contains(sourcesRoot)) {
-            Condition<VirtualFile> excludeFileCondition = library.getUnitedExcludeCondition();
+            Condition<? super VirtualFile> excludeFileCondition = library.getUnitedExcludeCondition();
             if (excludeFileCondition == null || !excludeFileCondition.value(virtualFile)) {
               list.add(library);
             }
@@ -590,7 +590,7 @@ public class UsageInfo2UsageAdapter implements UsageInModule, UsageInfoAdapter,
     // Presentation is expected to be always externally updated by calling updateCachedPresentation
     // Here we just return cached result because it must be always available for painting or speed search
     UsageNodePresentation cachedPresentation = getCachedPresentation();
-    return cachedPresentation != null ? cachedPresentation : UsageNodePresentation.EMPTY;
+    return cachedPresentation != null ? cachedPresentation : UsageNodePresentation.empty();
   }
 
   @NotNull

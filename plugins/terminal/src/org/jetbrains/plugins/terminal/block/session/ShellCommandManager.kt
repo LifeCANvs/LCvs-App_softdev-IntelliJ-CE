@@ -6,9 +6,11 @@ import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.jediterm.terminal.Terminal
 import com.jediterm.terminal.TerminalCustomCommandListener
+import com.jediterm.terminal.model.TerminalTextBuffer
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.plugins.terminal.TerminalUtil
 import org.jetbrains.plugins.terminal.block.prompt.TerminalPromptState
+import org.jetbrains.plugins.terminal.block.session.TerminalModel.Companion.clearAllAndMoveCursorToTopLeftCorner
 import org.jetbrains.plugins.terminal.util.ShellIntegration
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
@@ -16,10 +18,21 @@ import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-internal class ShellCommandManager(private val session: BlockTerminalSession) {
-  private val commandEndMarker: String? = session.commandBlockIntegration.commandEndMarker
-  private val terminal: Terminal = session.controller
-  private val shellIntegration: ShellIntegration = session.shellIntegration
+internal class ShellCommandManager(
+  private val commandEndMarker: String?,
+  private val terminal: Terminal,
+  private val shellIntegration: ShellIntegration,
+  private val parentDisposable: Disposable,
+  private val terminalTextBuffer: TerminalTextBuffer
+) {
+
+  constructor(session: BlockTerminalSession) : this(
+    session.commandBlockIntegration.commandEndMarker,
+    session.controller,
+    session.shellIntegration,
+    session as Disposable,
+    session.model.textBuffer
+  )
 
   private val listeners: CopyOnWriteArrayList<ShellCommandListener> = CopyOnWriteArrayList()
 
@@ -52,7 +65,7 @@ internal class ShellCommandManager(private val session: BlockTerminalSession) {
     val shellInfo = Param.SHELL_INFO.getDecodedValueOrNull(event.getOrNull(1)) ?: "{}"
     if (commandEndMarker != null) {
       debug { "Received initialized event, waiting for command end marker" }
-      ShellCommandEndMarkerListener(session) {
+      ShellCommandEndMarkerListener(terminalTextBuffer, commandEndMarker, parentDisposable) {
         fireInitialized(shellInfo)
       }
     }
@@ -74,7 +87,7 @@ internal class ShellCommandManager(private val session: BlockTerminalSession) {
     val startedCommand = this.startedCommand
     if (commandEndMarker != null) {
       debug { "Received command_finished event, waiting for command end marker" }
-      ShellCommandEndMarkerListener(session) {
+      ShellCommandEndMarkerListener(terminalTextBuffer, commandEndMarker, parentDisposable) {
         fireCommandFinished(startedCommand, exitCode)
         this.startedCommand = null
       }
@@ -111,7 +124,7 @@ internal class ShellCommandManager(private val session: BlockTerminalSession) {
     val exitCode = Param.EXIT_CODE.getIntValue(event.getOrNull(3))
     if (commandEndMarker != null) {
       debug { "Received generator_finished event, waiting for command end marker" }
-      ShellCommandEndMarkerListener(session) {
+      ShellCommandEndMarkerListener(terminalTextBuffer, commandEndMarker, parentDisposable) {
         fireGeneratorFinished(requestId, result, exitCode)
       }
     }
@@ -133,10 +146,8 @@ internal class ShellCommandManager(private val session: BlockTerminalSession) {
    * on command termination.
    */
   private fun clearTerminal() {
-    session.terminalStarterFuture.getNow(null)?.let {
-      debug { "force clearing terminal" }
-      session.model.clearAllAndMoveCursorToTopLeftCorner(it.terminal)
-    }
+    debug { "force clearing terminal" }
+    clearAllAndMoveCursorToTopLeftCorner(terminal)
   }
 
   private fun fireInitialized(rawShellInfo: String) {

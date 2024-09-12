@@ -377,6 +377,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/inDefaultValue.kt");
             }
 
+            @TestMetadata("invalidationOnSubstitution.kt")
+            public void testInvalidationOnSubstitution() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceParameter/invalidationOnSubstitution.kt");
+            }
+
             @TestMetadata("lambdaArgument.kt")
             public void testLambdaArgument() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/lambdaArgument.kt");
@@ -425,6 +430,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             @TestMetadata("quotedName.kt")
             public void testQuotedName() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/quotedName.kt");
+            }
+
+            @TestMetadata("receiverUsageEliminated.kt")
+            public void testReceiverUsageEliminated() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceParameter/receiverUsageEliminated.kt");
             }
 
             @TestMetadata("resultedType.kt")
@@ -512,6 +522,16 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/superCallArgument.kt");
             }
 
+            @TestMetadata("superFunctionWithDeleteUnusedParameter.kt")
+            public void testSuperFunctionWithDeleteUnusedParameter() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceParameter/superFunctionWithDeleteUnusedParameter.kt");
+            }
+
+            @TestMetadata("thisSubstitution.kt")
+            public void testThisSubstitution() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceParameter/thisSubstitution.kt");
+            }
+
             @TestMetadata("throw.kt")
             public void testThrow() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/throw.kt");
@@ -546,6 +566,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             public void testWhile() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/while.kt");
             }
+
+            @TestMetadata("withJavaSuper.kt")
+            public void testWithJavaSuper() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceParameter/withJavaSuper.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)
@@ -570,6 +595,30 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             public void testFullSelection() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceParameter/variableConversion/fullSelection.kt");
             }
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../idea/tests/testData/refactoring/introduceJavaParameter")
+    public static class IntroduceJavaParameter extends AbstractK2IntroduceParameterTest {
+        @java.lang.Override
+        @org.jetbrains.annotations.NotNull
+        public final KotlinPluginMode getPluginMode() {
+            return KotlinPluginMode.K2;
+        }
+
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doIntroduceJavaParameterTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("javaMethod.java")
+        public void testJavaMethod() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceJavaParameter/javaMethod.java");
+        }
+
+        @TestMetadata("javaMethodOverridingKotlinFunctionWithUsages.java")
+        public void testJavaMethodOverridingKotlinFunctionWithUsages() throws Exception {
+            runTest("../../idea/tests/testData/refactoring/introduceJavaParameter/javaMethodOverridingKotlinFunctionWithUsages.java");
         }
     }
 
@@ -755,6 +804,11 @@ public abstract class K2IntroduceParameterTestGenerated extends AbstractK2Introd
             @TestMetadata("lambdaParamOfUnit.kt")
             public void testLambdaParamOfUnit() throws Exception {
                 runTest("../../idea/tests/testData/refactoring/introduceLambdaParameter/lambdaParamOfUnit.kt");
+            }
+
+            @TestMetadata("lambdaParamWithClsSuper.kt")
+            public void testLambdaParamWithClsSuper() throws Exception {
+                runTest("../../idea/tests/testData/refactoring/introduceLambdaParameter/lambdaParamWithClsSuper.kt");
             }
 
             @TestMetadata("lambdaParamWithDefaultValue.kt")
